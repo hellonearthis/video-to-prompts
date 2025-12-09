@@ -1,0 +1,13 @@
+/**
+ * App.css - Application-specific styles
+ * 
+ * Overrides for full-width layout in Electron app.
+ */
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
