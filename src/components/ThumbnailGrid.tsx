@@ -5,7 +5,10 @@
  * 
  * Features:
  * - Responsive grid that adapts to container width
- * - Color-coded frame type badges (blue for keyframes, orange for scene changes)
+ * - Color-coded frame type badges:
+ *   - Blue: Time-based frames (extracted at intervals)
+ *   - Green: Keyframes (actual I-frames from video encoding)
+ *   - Orange: Scene change frames
  * - Flexible layout - expands to show all frames without fixed height
  */
 
@@ -17,7 +20,7 @@ import React from 'react';
 
 export interface FrameData {
     path: string;
-    type: 'keyframe' | 'scene';
+    type: 'time' | 'keyframe' | 'scene';
     frame?: number;
     time?: number;
     pts?: number;
@@ -105,13 +108,17 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                         <div style={{ padding: '8px', fontSize: '0.8rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                 <span style={{
-                                    backgroundColor: frame.type === 'keyframe' ? '#007AFF' : '#FF9500',
+                                    backgroundColor: frame.type === 'time' ? '#007AFF'
+                                        : frame.type === 'keyframe' ? '#28a745'
+                                            : '#FF9500',
                                     color: 'white',
                                     padding: '1px 5px',
                                     borderRadius: '3px',
                                     fontSize: '0.65rem'
                                 }}>
-                                    {frame.type === 'keyframe' ? 'FRAME' : 'SCENE'}
+                                    {frame.type === 'time' ? 'TIME'
+                                        : frame.type === 'keyframe' ? 'KEYFRAME'
+                                            : 'SCENE'}
                                 </span>
                                 <span style={{ color: '#aaa' }}>{frame.time?.toFixed(2)}s</span>
                             </div>

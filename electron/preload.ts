@@ -32,7 +32,8 @@ import { ipcRenderer, contextBridge } from 'electron'
  * 
  * Custom APIs:
  * - selectFile(): Open file picker dialog
- * - extractKeyframes(filePath, outputDir): Extract video frames
+ * - extractTimeFrames(filePath, outputDir, fps): Extract frames at time intervals
+ * - extractKeyframes(filePath, outputDir): Extract actual video keyframes (I-frames)
  * - extractSceneChanges(filePath, outputDir, threshold): Detect scene changes
  */
 contextBridge.exposeInMainWorld('ipcRenderer', {
@@ -102,16 +103,27 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   selectFile: () => ipcRenderer.invoke('select-file'),
 
   /**
-   * Extracts frames from a video at regular intervals.
-   * Triggers the 'extract-keyframes' IPC handler in main.ts.
+   * Extracts frames from a video at regular time intervals.
+   * Triggers the 'extract-time-frames' IPC handler in main.ts.
    * 
    * @param filePath - Absolute path to the video file
    * @param outputDir - Directory where frames will be saved
    * @param fps - Frames per second to extract (default: 1)
    * @returns Promise resolving to array of extracted frame paths
    */
-  extractKeyframes: (filePath: string, outputDir: string, fps?: number) =>
-    ipcRenderer.invoke('extract-keyframes', filePath, outputDir, fps),
+  extractTimeFrames: (filePath: string, outputDir: string, fps?: number) =>
+    ipcRenderer.invoke('extract-time-frames', filePath, outputDir, fps),
+
+  /**
+   * Extracts actual keyframes (I-frames) from a video.
+   * Triggers the 'extract-keyframes' IPC handler in main.ts.
+   * 
+   * @param filePath - Absolute path to the video file
+   * @param outputDir - Directory where frames will be saved
+   * @returns Promise resolving to array of extracted frame paths
+   */
+  extractKeyframes: (filePath: string, outputDir: string) =>
+    ipcRenderer.invoke('extract-keyframes', filePath, outputDir),
 
   /**
    * Detects and extracts frames where significant scene changes occur.

@@ -5,9 +5,12 @@ A desktop application that breaks down video clips into important visual compone
 ## Features
 
 - **Video Import**: Drag-and-drop or file picker for video files (MP4, MOV, AVI, MKV)
-- **Frame Extraction**: Extract frames at regular intervals (1 fps by default)
-- **Scene Detection**: Detect and extract frames where significant scene changes occur
-- **Thumbnail Grid**: Visual display of extracted frames with metadata
+- **Video Metadata**: Display duration, FPS, resolution, codec, and bitrate
+- **Frame Extraction**: Three extraction modes:
+  - **Time Frames**: Extract frames at regular time intervals (configurable FPS)
+  - **Keyframes**: Extract actual video keyframes (I-frames from video encoding)
+  - **Scene Detection**: Detect and extract frames where significant visual changes occur
+- **Thumbnail Grid**: Visual display of extracted frames with color-coded badges and metadata
 - **AI Descriptions** *(Coming Soon)*: Generate text descriptions using local LM Studio
 
 ## Getting Started
@@ -71,14 +74,16 @@ The main entry point for the Electron application. Responsibilities:
 #### `electron/preload.ts`
 The secure bridge between the main process and renderer. Responsibilities:
 - Exposes safe IPC methods to the renderer via `contextBridge`
-- Provides `selectFile()`, `extractKeyframes()`, and `extractSceneChanges()` APIs
+- Provides `selectFile()`, `extractTimeFrames()`, `extractKeyframes()`, and `extractSceneChanges()` APIs
 - Maintains security by controlling what the renderer can access
 
 #### `electron/ffmpeg.ts`
 Video processing module using FFmpeg. Responsibilities:
-- Locates the bundled FFmpeg binary (`ffmpeg-static`)
-- `extractKeyframes()`: Extracts frames at regular intervals using fps filter
+- Locates the bundled FFmpeg/FFprobe binaries (`ffmpeg-static`, `ffprobe-static`)
+- `extractTimeFrames()`: Extracts frames at regular time intervals using fps filter
+- `extractKeyframes()`: Extracts actual video keyframes (I-frames) from the encoding
 - `extractSceneChanges()`: Detects scene changes and extracts those frames
+- `getVideoInfo()`: Gets video metadata (duration, fps, resolution, codec, bitrate)
 - Parses FFmpeg output to extract frame metadata (timestamps, PTS values)
 
 ### React (Renderer Process)
@@ -97,14 +102,18 @@ Video file selection component. Responsibilities:
 
 #### `src/components/ControlPanel.tsx`
 Extraction settings interface. Responsibilities:
+- FPS input for time-based extraction rate
 - Scene detection threshold slider (0.1 - 1.0)
-- Checkboxes for keyframe and scene change extraction modes
+- Checkboxes for extraction modes (Time Frames, Keyframes, Scene Changes)
 - "Run Extraction" button with processing state
 
 #### `src/components/ThumbnailGrid.tsx`
 Displays extracted frames in a responsive grid. Responsibilities:
 - Shows frame thumbnails with metadata (type, timestamp, frame number)
-- Color-coded badges (blue for keyframes, orange for scene changes)
+- Color-coded badges:
+  - Blue: Time-based frames (extracted at intervals)
+  - Green: Keyframes (actual I-frames from video encoding)
+  - Orange: Scene change frames
 - "Generate AI Descriptions" button (Phase 3 feature)
 - Displays AI-generated descriptions when available
 
@@ -119,12 +128,14 @@ Displays extracted frames in a responsive grid. Responsibilities:
 ## How It Works
 
 1. **User loads a video** via drag-and-drop or file picker
-2. **App runs FFmpeg** to extract frames based on selected options:
-   - Keyframes: Extracts 1 frame per second
-   - Scene Changes: Detects visual changes using threshold
-3. **Frames are displayed** in a thumbnail grid with metadata
-4. **User can adjust settings** and re-run extraction
-5. **AI descriptions** *(Phase 3)*: Send frames to local LLM for captioning
+2. **Video metadata is displayed** (duration, FPS, resolution, codec, bitrate)
+3. **App runs FFmpeg** to extract frames based on selected options:
+   - **Time Frames**: Samples frames at regular time intervals (e.g., 1 fps)
+   - **Keyframes**: Extracts actual I-frames from the video encoding
+   - **Scene Changes**: Detects visual changes using configurable threshold
+4. **Frames are displayed** in a thumbnail grid with color-coded type badges
+5. **User can adjust settings** and re-run extraction
+6. **AI descriptions** *(Phase 3)*: Send frames to local LLM for captioning
 
 ## License
 

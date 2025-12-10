@@ -52,8 +52,11 @@ function App() {
   /** Scene detection threshold */
   const [threshold, setThreshold] = useState(0.3);
 
-  /** Whether to extract frames at intervals */
-  const [doKeyframes, setDoKeyframes] = useState(true);
+  /** Whether to extract frames at time intervals */
+  const [doTimeFrames, setDoTimeFrames] = useState(true);
+
+  /** Whether to extract actual keyframes (I-frames) */
+  const [doKeyframes, setDoKeyframes] = useState(false);
 
   /** Whether to extract scene change frames */
   const [doSceneChanges, setDoSceneChanges] = useState(true);
@@ -100,14 +103,25 @@ function App() {
       const outputDir = filePath + '_extracted';
       const newFrames: FrameData[] = [];
 
-      if (doKeyframes) {
+      if (doTimeFrames) {
         console.log(`Extracting frames at ${fps} fps...`);
-        const paths = await window.ipcRenderer.extractKeyframes(filePath, outputDir, fps);
+        const paths = await window.ipcRenderer.extractTimeFrames(filePath, outputDir, fps);
         newFrames.push(...paths.map((p, i) => ({
+          path: p,
+          type: 'time' as const,
+          frame: i + 1,
+          time: (i + 1) / fps
+        })));
+      }
+
+      if (doKeyframes) {
+        console.log('Extracting Keyframes (I-frames)...');
+        const paths = await window.ipcRenderer.extractKeyframes(filePath, outputDir);
+        newFrames.push(...paths.map((p: string, i: number) => ({
           path: p,
           type: 'keyframe' as const,
           frame: i + 1,
-          time: (i + 1) / fps
+          time: undefined // Keyframes don't have predictable timing
         })));
       }
 
@@ -237,6 +251,8 @@ function App() {
             setFps={setFps}
             threshold={threshold}
             setThreshold={setThreshold}
+            extractTimeFrames={doTimeFrames}
+            setExtractTimeFrames={setDoTimeFrames}
             extractKeyframes={doKeyframes}
             setExtractKeyframes={setDoKeyframes}
             extractSceneChanges={doSceneChanges}

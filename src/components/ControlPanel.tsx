@@ -4,9 +4,12 @@
  * A settings panel for configuring video frame extraction options.
  * 
  * Features:
- * - Frames per second (FPS) input for keyframe extraction rate
+ * - Frames per second (FPS) input for time-based extraction rate
  * - Scene detection threshold slider (0.1 - 1.0)
- * - Checkbox toggles for extraction modes
+ * - Checkbox toggles for extraction modes:
+ *   - Time Frames: Extract frames at regular time intervals
+ *   - Keyframes: Extract actual video keyframes (I-frames)
+ *   - Scene Changes: Extract frames where scene changes detected
  * - Run Extraction button with loading state
  * 
  * The panel is disabled during processing to prevent conflicting operations.
@@ -22,7 +25,7 @@ import React from 'react';
  * Props for the ControlPanel component.
  */
 interface ControlPanelProps {
-    /** Frames per second to extract for keyframe mode */
+    /** Frames per second to extract for time-based mode */
     fps: number;
     /** Callback to update fps value */
     setFps: (val: number) => void;
@@ -32,7 +35,12 @@ interface ControlPanelProps {
     /** Callback to update the threshold value */
     setThreshold: (val: number) => void;
 
-    /** Whether keyframe extraction is enabled */
+    /** Whether time-based frame extraction is enabled */
+    extractTimeFrames: boolean;
+    /** Callback to toggle time-based extraction */
+    setExtractTimeFrames: (val: boolean) => void;
+
+    /** Whether keyframe (I-frame) extraction is enabled */
     extractKeyframes: boolean;
     /** Callback to toggle keyframe extraction */
     setExtractKeyframes: (val: boolean) => void;
@@ -58,6 +66,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     setFps,
     threshold,
     setThreshold,
+    extractTimeFrames,
+    setExtractTimeFrames,
     extractKeyframes,
     setExtractKeyframes,
     extractSceneChanges,
@@ -79,10 +89,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* --------------------------------------------------------------------------
           Frames Per Second Input
           
-          Controls how many frames per second to extract in keyframe mode.
+          Controls how many frames per second to extract in time-based mode.
           -------------------------------------------------------------------------- */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <label htmlFor="fps" style={{ fontSize: '0.8rem', color: '#aaa' }}>FPS to Extract</label>
+                <label htmlFor="fps" style={{ fontSize: '0.8rem', color: '#aaa' }}>FPS (Time-based)</label>
                 <input
                     id="fps"
                     type="number"
@@ -136,11 +146,27 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                 }}>
                     <input
                         type="checkbox"
+                        checked={extractTimeFrames}
+                        onChange={(e) => setExtractTimeFrames(e.target.checked)}
+                        disabled={isProcessing}
+                    />
+                    Time Frames
+                </label>
+
+                <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem'
+                }}>
+                    <input
+                        type="checkbox"
                         checked={extractKeyframes}
                         onChange={(e) => setExtractKeyframes(e.target.checked)}
                         disabled={isProcessing}
                     />
-                    Extract Frames
+                    Keyframes
                 </label>
 
                 <label style={{
@@ -165,7 +191,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           -------------------------------------------------------------------------- */}
             <button
                 onClick={onRunExtraction}
-                disabled={isProcessing || (!extractKeyframes && !extractSceneChanges)}
+                disabled={isProcessing || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges)}
                 style={{
                     padding: '8px 16px',
                     backgroundColor: isProcessing ? '#555' : '#007AFF',

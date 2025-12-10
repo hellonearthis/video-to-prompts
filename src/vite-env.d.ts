@@ -19,7 +19,8 @@ interface VideoInfo {
 interface Window {
     ipcRenderer: {
         selectFile: () => Promise<string | null>;
-        extractKeyframes: (filePath: string, outputDir: string, fps?: number) => Promise<string[]>;
+        extractTimeFrames: (filePath: string, outputDir: string, fps?: number) => Promise<string[]>;
+        extractKeyframes: (filePath: string, outputDir: string) => Promise<string[]>;
         extractSceneChanges: (filePath: string, outputDir: string, threshold: number) => Promise<{ path: string; time: number; pts: number; frame: number }[]>;
         getVideoInfo: (filePath: string) => Promise<VideoInfo>;
         on: (channel: string, listener: (event: any, ...args: any[]) => void) => void;

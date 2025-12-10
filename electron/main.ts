@@ -13,17 +13,14 @@
  */
 
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
-import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { extractKeyframes, extractSceneChanges, getVideoInfo } from './ffmpeg'
+import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo } from './ffmpeg'
 
 // ============================================================================
 // ESM Compatibility
 // ============================================================================
 
-// Create a require function for ESM compatibility (needed for some packages)
-const require = createRequire(import.meta.url)
 // Get __dirname equivalent in ESM
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -173,17 +170,31 @@ app.whenReady().then(() => {
   })
 
   /**
-   * Handle keyframe extraction request.
+   * Handle time-based frame extraction request.
+   * Extracts frames at regular time intervals (fps-based sampling).
+   * Delegates to the FFmpeg module.
+   * 
+   * @param filePath - Path to the input video file
+   * @param outputDir - Directory to save extracted frames
+   * @param fps - Frames per second to extract
+   * @returns Array of extracted frame file paths
+   */
+  ipcMain.handle('extract-time-frames', async (_, filePath, outputDir, fps) => {
+    return await extractTimeFrames({ filePath, outputDir, fps })
+  })
+
+  /**
+   * Handle keyframe (I-frame) extraction request.
+   * Extracts actual video keyframes from the encoding.
    * Delegates to the FFmpeg module.
    * 
    * @param filePath - Path to the input video file
    * @param outputDir - Directory to save extracted frames
    * @returns Array of extracted frame file paths
    */
-  ipcMain.handle('extract-keyframes', async (_, filePath, outputDir, fps) => {
-    return await extractKeyframes({ filePath, outputDir, fps })
+  ipcMain.handle('extract-keyframes', async (_, filePath, outputDir) => {
+    return await extractKeyframes({ filePath, outputDir })
   })
-
   /**
    * Handle scene change extraction request.
    * Delegates to the FFmpeg module.
