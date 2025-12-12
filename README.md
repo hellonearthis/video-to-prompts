@@ -1,24 +1,43 @@
 # Video to Prompts
 
-A desktop application that breaks down video clips into important visual components for analysis, asset creation, editing, or production planning.
+A desktop application that breaks down video clips into important visual components for analysis, asset creation, editing, or production planning. Uses **local AI** (LM Studio) to generate descriptions and analyze action between frames.
 
 ## Features
 
+### Frame Extraction
 - **Video Import**: Drag-and-drop or file picker for video files (MP4, MOV, AVI, MKV)
 - **Video Metadata**: Display duration, FPS, resolution, codec, and bitrate
-- **Frame Extraction**: Three extraction modes:
+- **Three Extraction Modes**:
   - **Time Frames**: Extract frames at regular time intervals (configurable FPS)
   - **Keyframes**: Extract actual video keyframes (I-frames from video encoding)
   - **Scene Detection**: Detect and extract frames where significant visual changes occur
-- **Thumbnail Grid**: Visual display of extracted frames with color-coded badges and metadata
-- **AI Descriptions** *(Coming Soon)*: Generate text descriptions using local LM Studio
+
+### AI-Powered Analysis
+- **Frame Selection**: Click to select frames, Ctrl/Cmd+Click for multi-select, Shift+Click for range
+- **Analyze Selected/All**: Generate AI descriptions for individual frames
+- **Frame Comparison**: Select 2 frames to analyze the *action* and *object flow* between them
+- **Export to JSON**: Save all analysis data or comparison results
+
+### AI Analysis Output
+Each analyzed frame includes:
+- **Summary**: Concise description of frame content
+- **Objects**: List of detected objects
+- **Tags**: Descriptive keywords
+- **Scene Type**: indoor/outdoor/portrait/etc
+- **Visual Elements**: Dominant colors, lighting description
+
+Frame comparisons include:
+- **Action Description**: What's happening between frames
+- **Object Flow**: How objects moved or changed
+- **Differences**: Key visual differences
+
+## Requirements
+
+- **Node.js 18+**
+- **LM Studio** running locally at `http://localhost:1234`
+  - Recommended model: `qwen/qwen3-vl-4b` (vision model with multi-image support)
 
 ## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm
 
 ### Installation
 
@@ -38,14 +57,35 @@ npm run dev
 npm run build
 ```
 
+## Usage
+
+1. **Load a video** via drag-and-drop or file picker
+2. **Configure extraction settings** (FPS, scene threshold, extraction modes)
+3. **Click "Run Extraction"** to extract frames
+4. **Select frames** for analysis:
+   - Click a frame to select it
+   - Ctrl/Cmd+Click to add/remove from selection
+   - Shift+Click to select a range
+5. **Analyze frames**:
+   - Click **"Analyze Selected"** to analyze only selected frames
+   - Click **"Analyze All"** to analyze every frame
+6. **Compare two frames**:
+   - Select exactly 2 frames
+   - Click **"Compare Action"** (purple button)
+   - View the side-by-side comparison with AI analysis
+7. **Export results**:
+   - **"Export JSON"**: Saves all analyzed frame data
+   - **"Export to JSON"** (in comparison view): Saves comparison result
+
 ## Project Structure
 
 ```
 Video to Prompts/
 ├── electron/                    # Electron Main Process
-│   ├── main.ts                 # App entry point, window management, IPC handlers
+│   ├── main.ts                 # App entry, window management, IPC handlers
 │   ├── preload.ts              # Bridge between main and renderer processes
-│   └── ffmpeg.ts               # FFmpeg video processing functions
+│   ├── ffmpeg.ts               # FFmpeg video processing functions
+│   └── lmstudio.ts             # LM Studio AI integration
 ├── src/                         # React Frontend (Renderer Process)
 │   ├── App.tsx                 # Main application component
 │   ├── App.css                 # Application styles
@@ -54,68 +94,12 @@ Video to Prompts/
 │   └── components/
 │       ├── FilePicker.tsx      # Video file selection component
 │       ├── ControlPanel.tsx    # Extraction settings controls
-│       └── ThumbnailGrid.tsx   # Frame display grid
+│       ├── ThumbnailGrid.tsx   # Frame display grid with selection
+│       └── ComparisonView.tsx  # Frame comparison modal
 ├── package.json                 # Dependencies and scripts
 ├── vite.config.ts              # Vite bundler configuration
 └── tsconfig.json               # TypeScript configuration
 ```
-
-## File Descriptions
-
-### Electron (Main Process)
-
-#### `electron/main.ts`
-The main entry point for the Electron application. Responsibilities:
-- Creates and manages the application window (BrowserWindow)
-- Registers IPC handlers for communication with the renderer
-- Sets up the custom file protocol for loading local images
-- Handles app lifecycle events (ready, quit, activate)
-
-#### `electron/preload.ts`
-The secure bridge between the main process and renderer. Responsibilities:
-- Exposes safe IPC methods to the renderer via `contextBridge`
-- Provides `selectFile()`, `extractTimeFrames()`, `extractKeyframes()`, and `extractSceneChanges()` APIs
-- Maintains security by controlling what the renderer can access
-
-#### `electron/ffmpeg.ts`
-Video processing module using FFmpeg. Responsibilities:
-- Locates the bundled FFmpeg/FFprobe binaries (`ffmpeg-static`, `ffprobe-static`)
-- `extractTimeFrames()`: Extracts frames at regular time intervals using fps filter
-- `extractKeyframes()`: Extracts actual video keyframes (I-frames) from the encoding
-- `extractSceneChanges()`: Detects scene changes and extracts those frames
-- `getVideoInfo()`: Gets video metadata (duration, fps, resolution, codec, bitrate)
-- Parses FFmpeg output to extract frame metadata (timestamps, PTS values)
-
-### React (Renderer Process)
-
-#### `src/App.tsx`
-The main React component that orchestrates the UI. Responsibilities:
-- Manages application state (selected file, frames, settings)
-- Coordinates extraction workflow by calling IPC methods
-- Renders either FilePicker (no file) or ControlPanel + ThumbnailGrid (file selected)
-
-#### `src/components/FilePicker.tsx`
-Video file selection component. Responsibilities:
-- Provides drag-and-drop zone for video files
-- Click-to-browse functionality via native file dialog
-- Visual feedback during drag operations
-
-#### `src/components/ControlPanel.tsx`
-Extraction settings interface. Responsibilities:
-- FPS input for time-based extraction rate
-- Scene detection threshold slider (0.1 - 1.0)
-- Checkboxes for extraction modes (Time Frames, Keyframes, Scene Changes)
-- "Run Extraction" button with processing state
-
-#### `src/components/ThumbnailGrid.tsx`
-Displays extracted frames in a responsive grid. Responsibilities:
-- Shows frame thumbnails with metadata (type, timestamp, frame number)
-- Color-coded badges:
-  - Blue: Time-based frames (extracted at intervals)
-  - Green: Keyframes (actual I-frames from video encoding)
-  - Orange: Scene change frames
-- "Generate AI Descriptions" button (Phase 3 feature)
-- Displays AI-generated descriptions when available
 
 ## Technology Stack
 
@@ -124,18 +108,65 @@ Displays extracted frames in a responsive grid. Responsibilities:
 - **TypeScript**: Type-safe JavaScript
 - **Vite**: Fast build tool and dev server
 - **FFmpeg**: Video processing (via `ffmpeg-static`)
+- **LM Studio**: Local AI inference (vision models)
 
 ## How It Works
 
 1. **User loads a video** via drag-and-drop or file picker
 2. **Video metadata is displayed** (duration, FPS, resolution, codec, bitrate)
-3. **App runs FFmpeg** to extract frames based on selected options:
-   - **Time Frames**: Samples frames at regular time intervals (e.g., 1 fps)
-   - **Keyframes**: Extracts actual I-frames from the video encoding
-   - **Scene Changes**: Detects visual changes using configurable threshold
-4. **Frames are displayed** in a thumbnail grid with color-coded type badges
-5. **User can adjust settings** and re-run extraction
-6. **AI descriptions** *(Phase 3)*: Send frames to local LLM for captioning
+3. **FFmpeg extracts frames** based on selected options
+4. **Frames are displayed** in a thumbnail grid with color-coded type badges:
+   - 🔵 Blue: Time-based frames
+   - 🟢 Green: Keyframes (I-frames)
+   - 🟠 Orange: Scene change frames
+5. **User selects frames** for AI analysis
+6. **LM Studio analyzes frames** via local API:
+   - Single frames: Generates summary, objects, tags, scene type
+   - Two frames: Analyzes action, object flow, and differences
+7. **Results can be exported** to JSON for further use
+
+## JSON Export Format
+
+### Frame Analysis Export
+```json
+{
+  "source_video": "C:/path/to/video.mp4",
+  "exported_at": "2025-12-13T...",
+  "total_frames": 10,
+  "analyzed_frames": 10,
+  "frames": [
+    {
+      "path": "...",
+      "type": "scene",
+      "time": 1.5,
+      "description": "A person walking...",
+      "objects": ["person", "tree", "car"],
+      "tags": ["outdoor", "daytime", "urban"],
+      "scene_type": "outdoor",
+      "visual_elements": {
+        "dominant_colors": ["blue", "green"],
+        "lighting": "natural daylight"
+      }
+    }
+  ]
+}
+```
+
+### Frame Comparison Export
+```json
+{
+  "source_video": "C:/path/to/video.mp4",
+  "exported_at": "2025-12-13T...",
+  "start_frame": "path/to/frame1.png",
+  "end_frame": "path/to/frame2.png",
+  "analysis": {
+    "action_description": "The person moves from left to right...",
+    "object_flow": "The car in the background has moved...",
+    "differences": ["Person position changed", "Lighting shifted"],
+    "confidence": 0.9
+  }
+}
+```
 
 ## License
 
