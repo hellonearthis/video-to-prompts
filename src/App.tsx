@@ -14,6 +14,7 @@ import './App.css';
 import { FilePicker } from './components/FilePicker';
 import { ControlPanel } from './components/ControlPanel';
 import { ThumbnailGrid, FrameData } from './components/ThumbnailGrid';
+import { ComparisonView } from './components/ComparisonView';
 
 /**
  * Video metadata type (matches VideoInfo from backend)
@@ -67,6 +68,26 @@ function App() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDescribing, setIsDescribing] = useState(false);
+
+  // --------------------------------------------------------------------------
+  // Selection and Analysis State
+  // --------------------------------------------------------------------------
+
+  /** Set of selected frame indices */
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+  /** Current analysis progress */
+  const [analysisProgress, setAnalysisProgress] = useState<{ current: number; total: number } | undefined>();
+
+  /** Comparison result */
+  const [comparisonResult, setComparisonResult] = useState<{
+    frame1: string;
+    frame2: string;
+    result: ComparisonResult;
+  } | null>(null);
+
+  /** Is comparison exporting */
+  const [isExportingComparison, setIsExportingComparison] = useState(false);
 
   // ============================================================================
   // Effects
@@ -151,10 +172,202 @@ function App() {
     }
   };
 
-  const handleGenerateDescriptions = async () => {
-    alert("Coming in Phase 3!");
+  /**
+   * Core function to analyze frames using LM Studio
+   */
+  const analyzeFrames = async (indicesToAnalyze: number[]) => {
+    if (indicesToAnalyze.length === 0) return;
+
     setIsDescribing(true);
-    setTimeout(() => setIsDescribing(false), 1000);
+    setAnalysisProgress({ current: 0, total: indicesToAnalyze.length });
+
+    try {
+      // Check if LM Studio is available
+      const isAvailable = await window.ipcRenderer.checkLMStudio();
+      if (!isAvailable) {
+        alert('LM Studio is not running. Please start LM Studio at http://localhost:1234');
+        return;
+      }
+
+      // Analyze each frame and update state progressively
+      const newFrames = [...frames];
+
+      for (let i = 0; i < indicesToAnalyze.length; i++) {
+        const frameIndex = indicesToAnalyze[i];
+        const frame = newFrames[frameIndex];
+
+        setAnalysisProgress({ current: i + 1, total: indicesToAnalyze.length });
+
+        try {
+          const result = await window.ipcRenderer.analyzeFrame(frame.path);
+
+          if (result.success && result.analysis) {
+            newFrames[frameIndex] = {
+              ...frame,
+              description: result.analysis.summary,
+              objects: result.analysis.objects,
+              tags: result.analysis.tags,
+              scene_type: result.analysis.scene_type,
+              visual_elements: result.analysis.visual_elements,
+              isAnalyzed: true,
+              analysisError: undefined
+            };
+          } else {
+            newFrames[frameIndex] = {
+              ...frame,
+              isAnalyzed: false,
+              analysisError: result.error || 'Unknown error'
+            };
+          }
+
+          // Update state after each frame to show progress
+          setFrames([...newFrames]);
+
+        } catch (error) {
+          console.error(`Error analyzing frame ${frameIndex}:`, error);
+          newFrames[frameIndex] = {
+            ...frame,
+            isAnalyzed: false,
+            analysisError: error instanceof Error ? error.message : 'Analysis failed'
+          };
+          setFrames([...newFrames]);
+        }
+      }
+
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert('Analysis failed: ' + (error instanceof Error ? error.message : error));
+    } finally {
+      setIsDescribing(false);
+      setAnalysisProgress(undefined);
+    }
+  };
+
+  /**
+   * Analyze only selected frames
+   */
+  const handleAnalyzeSelected = async () => {
+    const indices = Array.from(selectedIndices).sort((a, b) => a - b);
+    await analyzeFrames(indices);
+  };
+
+  /**
+   * Analyze all frames
+   */
+  const handleAnalyzeAll = async () => {
+    const allIndices = frames.map((_, i) => i);
+    await analyzeFrames(allIndices);
+  };
+
+  /**
+   * Handle comparing two selected frames
+   */
+  const handleCompareSelected = async () => {
+    if (selectedIndices.size !== 2) return;
+
+    // Get selected frames and sort by index (time)
+    const selectedFrames = Array.from(selectedIndices)
+      .sort((a, b) => a - b)
+      .map(index => frames[index]);
+
+    const [frame1, frame2] = selectedFrames;
+
+    try {
+      setIsDescribing(true);
+
+      const result = await window.ipcRenderer.compareFrames(frame1.path, frame2.path);
+
+      if (result.success && result.comparison) {
+        setComparisonResult({
+          frame1: frame1.path,
+          frame2: frame2.path,
+          result: result.comparison
+        });
+      } else {
+        alert(`Comparison failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Comparison error:', error);
+      alert('Comparison failed due to an error');
+    } finally {
+      setIsDescribing(false);
+    }
+  };
+
+  /**
+   * Export comparison result
+   */
+  const handleExportComparison = async () => {
+    if (!comparisonResult || !filePath) return;
+
+    const data = {
+      source_video: filePath,
+      exported_at: new Date().toISOString(),
+      start_frame: comparisonResult.frame1,
+      end_frame: comparisonResult.frame2,
+      analysis: comparisonResult.result
+    };
+
+    const outputDir = filePath + '_extracted';
+
+    try {
+      setIsExportingComparison(true);
+      const result = await window.ipcRenderer.exportComparisonJson(outputDir, data);
+
+      if (result.success) {
+        alert(`Comparison exported to:\n${result.path}`);
+      } else {
+        alert(`Export failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed');
+    } finally {
+      setIsExportingComparison(false);
+    }
+  };
+
+  /**
+   * Export analyzed frames data to JSON file
+   */
+  const handleExportJson = async () => {
+    if (!filePath) return;
+
+    // Build export data from analyzed frames
+    const exportData = {
+      source_video: filePath,
+      exported_at: new Date().toISOString(),
+      total_frames: frames.length,
+      analyzed_frames: frames.filter(f => f.isAnalyzed).length,
+      frames: frames
+        .filter(f => f.isAnalyzed)
+        .map(f => ({
+          path: f.path,
+          type: f.type,
+          time: f.time,
+          description: f.description,
+          objects: f.objects,
+          tags: f.tags,
+          scene_type: f.scene_type,
+          visual_elements: f.visual_elements
+        }))
+    };
+
+    // Export to the same folder as extracted frames
+    const outputDir = filePath + '_extracted';
+
+    try {
+      const result = await window.ipcRenderer.exportAnalysisJson(outputDir, exportData);
+
+      if (result.success) {
+        alert(`Analysis exported to:\n${result.path}`);
+      } else {
+        alert(`Export failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed: ' + (error instanceof Error ? error.message : error));
+    }
   };
 
   // ============================================================================
@@ -264,9 +477,28 @@ function App() {
           {/* Thumbnail Grid - flexible height, scrolls with page */}
           <ThumbnailGrid
             frames={frames}
-            onGenerateDescriptions={handleGenerateDescriptions}
+            selectedIndices={selectedIndices}
+            onSelectionChange={setSelectedIndices}
+            onAnalyzeSelected={handleAnalyzeSelected}
+            onAnalyzeAll={handleAnalyzeAll}
+            onExportJson={handleExportJson}
+            onCompareSelected={handleCompareSelected}
             isDescribing={isDescribing}
+            analysisProgress={analysisProgress}
+            hasAnalyzedFrames={frames.some(f => f.isAnalyzed)}
           />
+
+          {/* Comparison Modal */}
+          {comparisonResult && (
+            <ComparisonView
+              frame1Path={comparisonResult.frame1}
+              frame2Path={comparisonResult.frame2}
+              comparisonResult={comparisonResult.result}
+              onClose={() => setComparisonResult(null)}
+              onExport={handleExportComparison}
+              isExporting={isExportingComparison}
+            />
+          )}
         </>
       )}
     </div>

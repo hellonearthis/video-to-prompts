@@ -146,4 +146,69 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    */
   getVideoInfo: (filePath: string) =>
     ipcRenderer.invoke('get-video-info', filePath),
+
+  // --------------------------------------------------------------------------
+  // AI Analysis APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * Checks if LM Studio is running and accessible.
+   * 
+   * @returns Promise resolving to boolean
+   */
+  checkLMStudio: () =>
+    ipcRenderer.invoke('check-lmstudio'),
+
+  /**
+   * Analyzes a single frame using LM Studio vision model.
+   * 
+   * @param imagePath - Absolute path to the image file
+   * @returns Promise resolving to analysis result
+   */
+  analyzeFrame: (imagePath: string) =>
+    ipcRenderer.invoke('analyze-frame', imagePath),
+
+  /**
+   * Analyzes multiple frames in batch.
+   * Progress updates are received via the 'analysis-progress' event.
+   * 
+   * @param imagePaths - Array of image file paths
+   * @returns Promise resolving to array of analysis results
+   */
+  analyzeFramesBatch: (imagePaths: string[]) =>
+    ipcRenderer.invoke('analyze-frames-batch', imagePaths),
+
+  // --------------------------------------------------------------------------
+  // Export APIs
+  // --------------------------------------------------------------------------
+
+  /**
+   * Exports analysis data to a JSON file.
+   * 
+   * @param outputDir - Directory to save the JSON file
+   * @param data - Analysis data to export
+   * @returns Promise resolving to export result
+   */
+  exportAnalysisJson: (outputDir: string, data: object) =>
+    ipcRenderer.invoke('export-analysis-json', outputDir, data),
+
+  /**
+   * Compare two frames to analyze action and flow.
+   * 
+   * @param frame1Path - Path to the first frame
+   * @param frame2Path - Path to the second frame
+   * @returns Promise resolving to comparison result
+   */
+  compareFrames: (frame1Path: string, frame2Path: string) =>
+    ipcRenderer.invoke('compare-frames', frame1Path, frame2Path),
+
+  /**
+   * Export comparison data to a JSON file.
+   * 
+   * @param outputDir - Directory to save the JSON file
+   * @param data - Comparison data to export
+   * @returns Promise resolving to export result
+   */
+  exportComparisonJson: (outputDir: string, data: object) =>
+    ipcRenderer.invoke('export-comparison-json', outputDir, data),
 })

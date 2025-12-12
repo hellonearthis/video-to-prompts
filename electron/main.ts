@@ -16,6 +16,7 @@ import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo } from './ffmpeg'
+import { analyzeFrame, analyzeFramesBatch, checkLMStudioConnection, compareFrames } from './lmstudio'
 
 // ============================================================================
 // ESM Compatibility
@@ -217,5 +218,110 @@ app.whenReady().then(() => {
    */
   ipcMain.handle('get-video-info', async (_, filePath) => {
     return await getVideoInfo(filePath)
+  })
+
+  // --------------------------------------------------------------------------
+  // AI Analysis Handlers
+  // --------------------------------------------------------------------------
+
+  /**
+   * Check if LM Studio is running and accessible.
+   * 
+   * @returns Boolean indicating if LM Studio is available
+   */
+  ipcMain.handle('check-lmstudio', async () => {
+    return await checkLMStudioConnection()
+  })
+
+  /**
+   * Analyze a single frame using LM Studio vision model.
+   * 
+   * @param imagePath - Path to the image file
+   * @returns Analysis result with summary, objects, tags, etc.
+   */
+  ipcMain.handle('analyze-frame', async (_, imagePath) => {
+    return await analyzeFrame(imagePath)
+  })
+
+  /**
+   * Analyze multiple frames in batch.
+   * Sends progress updates to renderer via webContents.
+   * 
+   * @param imagePaths - Array of image file paths
+   * @returns Array of analysis results
+   */
+  ipcMain.handle('analyze-frames-batch', async (_, imagePaths: string[]) => {
+    const results = await analyzeFramesBatch(imagePaths, (current, total, result) => {
+      // Send progress update to renderer
+      win?.webContents.send('analysis-progress', { current, total, result })
+    })
+    return results
+  })
+
+  /**
+   * Compare two frames to analyze action and flow.
+   * 
+   * @param frame1Path - Path to the first frame
+   * @param frame2Path - Path to the second frame
+   * @returns Comparison result
+   */
+  ipcMain.handle('compare-frames', async (_, frame1Path: string, frame2Path: string) => {
+    return await compareFrames(frame1Path, frame2Path)
+  })
+
+  // --------------------------------------------------------------------------
+  // Export Handlers
+  // --------------------------------------------------------------------------
+
+  /**
+   * Export analysis data to a JSON file.
+   * 
+   * @param outputDir - Directory to save the JSON file
+   * @param data - Analysis data to export
+   * @returns Object with success status and file path
+   */
+  ipcMain.handle('export-analysis-json', async (_, outputDir: string, data: object) => {
+    const fs = await import('fs/promises')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `analysis_${timestamp}.json`
+    const filePath = path.join(outputDir, filename)
+
+    try {
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+      console.log('[EXPORT] Analysis saved to:', filePath)
+      return { success: true, path: filePath }
+    } catch (error) {
+      console.error('[EXPORT] Failed to save analysis:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save file'
+      }
+    }
+  })
+
+  /**
+   * Export comparison data to a JSON file.
+   * 
+   * @param outputDir - Directory to save the JSON file
+   * @param data - Comparison data to export
+   * @returns Object with success status and file path
+   */
+  ipcMain.handle('export-comparison-json', async (_, outputDir: string, data: object) => {
+    const fs = await import('fs/promises')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `comparison_${timestamp}.json`
+    const filePath = path.join(outputDir, filename)
+
+    try {
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+      console.log('[EXPORT] Comparison saved to:', filePath)
+      return { success: true, path: filePath }
+    } catch (error) {
+      console.error('[EXPORT] Failed to save comparison:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save file'
+      }
+    }
   })
 })
