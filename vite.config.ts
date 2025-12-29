@@ -14,8 +14,11 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['ffmpeg-static', 'fluent-ffmpeg', 'ffprobe-static'],
+              external: ['ffmpeg-static', 'fluent-ffmpeg', 'ffprobe-static', 'onnxruntime-node', '@huggingface/transformers'],
             },
+          },
+          optimizeDeps: {
+            exclude: ['onnxruntime-node', '@huggingface/transformers'],
           },
         },
       },

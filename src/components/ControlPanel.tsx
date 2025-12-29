@@ -27,6 +27,8 @@ import React from 'react';
 interface ControlPanelProps {
     /** Frames per second to extract for time-based mode */
     fps: number;
+    /** Number of frames currently extracted */
+    framesCount: number;
     /** Callback to update fps value */
     setFps: (val: number) => void;
 
@@ -55,6 +57,15 @@ interface ControlPanelProps {
 
     /** Whether extraction is currently in progress */
     isProcessing: boolean;
+
+    /** Currently selected AI model ID (Now fixed to LM Studio) */
+    selectedModel: string;
+    /** Callback to update selected model */
+    onModelChange: () => void;
+    /** Callback to trigger sequential flow analysis */
+    onAnalyzeFlow: () => void;
+    /** Whether flow analysis is in progress */
+    isAnalyzingFlow: boolean;
 }
 
 // ============================================================================
@@ -73,7 +84,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     extractSceneChanges,
     setExtractSceneChanges,
     onRunExtraction,
-    isProcessing
+    isProcessing,
+    selectedModel,
+    onModelChange,
+    onAnalyzeFlow,
+    isAnalyzingFlow,
+    framesCount
 }) => {
     return (
         <div style={{
@@ -187,24 +203,63 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
 
             {/* --------------------------------------------------------------------------
+              AI Model / API Status
+              -------------------------------------------------------------------------- */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>AI Engine</label>
+                <button
+                    onClick={onModelChange}
+                    disabled={isProcessing}
+                    style={{
+                        padding: '4px 12px',
+                        backgroundColor: '#1e1e1e',
+                        border: '1px solid #444',
+                        borderRadius: '4px',
+                        color: '#eee',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem'
+                    }}
+                >
+                    {selectedModel} (Refresh)
+                </button>
+            </div>
+
+            {/* --------------------------------------------------------------------------
           Run Extraction Button
           -------------------------------------------------------------------------- */}
-            <button
-                onClick={onRunExtraction}
-                disabled={isProcessing || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges)}
-                style={{
-                    padding: '8px 16px',
-                    backgroundColor: isProcessing ? '#555' : '#007AFF',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: isProcessing ? 'not-allowed' : 'pointer',
-                    fontWeight: 'bold',
-                    marginLeft: 'auto'
-                }}
-            >
-                {isProcessing ? 'Extracting...' : 'Run Extraction'}
-            </button>
+            <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
+                <button
+                    onClick={onAnalyzeFlow}
+                    disabled={isProcessing || isAnalyzingFlow || framesCount < 2}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: (isProcessing || isAnalyzingFlow) ? '#555' : '#6f42c1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: (isProcessing || isAnalyzingFlow) ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                    }}
+                >
+                    {isAnalyzingFlow ? 'Analyzing Flow...' : 'Analyze Flow'}
+                </button>
+
+                <button
+                    onClick={onRunExtraction}
+                    disabled={isProcessing || isAnalyzingFlow || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges)}
+                    style={{
+                        padding: '8px 16px',
+                        backgroundColor: isProcessing ? '#555' : '#007AFF',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: isProcessing ? 'not-allowed' : 'pointer',
+                        fontWeight: 'bold',
+                    }}
+                >
+                    {isProcessing ? 'Extracting...' : 'Run Extraction'}
+                </button>
+            </div>
         </div>
     );
 };

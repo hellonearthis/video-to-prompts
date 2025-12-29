@@ -68,6 +68,26 @@ interface FrameComparisonResult {
 }
 
 /**
+ * Result of a single pair comparison in a sequential flow.
+ */
+interface FlowPairResult {
+    index: number;
+    frame1: string;
+    frame2: string;
+    comparison?: ComparisonResult;
+    error?: string;
+}
+
+/**
+ * complete result of a sequential flow analysis.
+ */
+interface FlowAnalysisResult {
+    success: boolean;
+    results?: FlowPairResult[];
+    error?: string;
+}
+
+/**
  * Extend the global Window interface with our IPC APIs.
  */
 interface Window {
@@ -77,13 +97,16 @@ interface Window {
         extractKeyframes: (filePath: string, outputDir: string) => Promise<string[]>;
         extractSceneChanges: (filePath: string, outputDir: string, threshold: number) => Promise<{ path: string; time: number; pts: number; frame: number }[]>;
         getVideoInfo: (filePath: string) => Promise<VideoInfo>;
-        checkLMStudio: () => Promise<boolean>;
+        checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
+        initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;
         analyzeFrame: (imagePath: string) => Promise<AnalysisResult>;
         analyzeFramesBatch: (imagePaths: string[]) => Promise<AnalysisResult[]>;
         compareFrames: (frame1Path: string, frame2Path: string) => Promise<FrameComparisonResult>;
+        compareSequential: (imagePaths: string[]) => Promise<FlowAnalysisResult>;
         exportAnalysisJson: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
         exportComparisonJson: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
-        on: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+        exportFlowReport: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
+        on: (channel: string, listener: (event: any, ...args: any[]) => void) => () => void;
         off: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
     }
 }

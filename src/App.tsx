@@ -15,6 +15,7 @@ import { FilePicker } from './components/FilePicker';
 import { ControlPanel } from './components/ControlPanel';
 import { ThumbnailGrid, FrameData } from './components/ThumbnailGrid';
 import { ComparisonView } from './components/ComparisonView';
+import { FlowReport } from './components/FlowReport';
 
 /**
  * Video metadata type (matches VideoInfo from backend)
@@ -89,6 +90,17 @@ function App() {
   /** Is comparison exporting */
   const [isExportingComparison, setIsExportingComparison] = useState(false);
 
+  /** Sequential flow analysis results */
+  const [flowResults, setFlowResults] = useState<FlowPairResult[] | null>(null);
+  const [isAnalyzingFlow, setIsAnalyzingFlow] = useState(false);
+  const [flowProgress, setFlowProgress] = useState<{ current: number, total: number } | undefined>();
+
+  // --------------------------------------------------------------------------
+  // AI Model State (LM Studio)
+  // --------------------------------------------------------------------------
+
+  const [aiStatusMessage, setAiStatusMessage] = useState<string>('Checking LM Studio...');
+
   // ============================================================================
   // Effects
   // ============================================================================
@@ -104,6 +116,42 @@ function App() {
     }
   }, [filePath]);
 
+  /**
+   * Listen for analysis progress (from LM Studio batch)
+   */
+  useEffect(() => {
+    const removeSingle = window.ipcRenderer.on('analysis-progress', (_event, data: any) => {
+      setAnalysisProgress({ current: data.current, total: data.total });
+    });
+
+    const removeFlow = window.ipcRenderer.on('flow-analysis-progress', (_event, data: any) => {
+      setFlowProgress({ current: data.current, total: data.total });
+    });
+
+    return () => {
+      removeSingle();
+      removeFlow();
+    };
+  }, []);
+
+  /**
+   * Initialize LM Studio connection on load
+   */
+  useEffect(() => {
+    window.ipcRenderer.checkLMStudio()
+      .then((result: any) => {
+        if (result.success) {
+          setAiStatusMessage('LM Studio Connected');
+        } else {
+          setAiStatusMessage('LM Studio Disconnected');
+        }
+      })
+      .catch((err: Error) => {
+        console.error('Failed to connect to LM Studio:', err);
+        setAiStatusMessage('Connection Error');
+      });
+  }, []);
+
   // ============================================================================
   // Event Handlers
   // ============================================================================
@@ -112,6 +160,24 @@ function App() {
     setFilePath(path);
     setVideoInfo(null);
     setFrames([]);
+  };
+
+  const handleModelChange = () => {
+    // Refresh connection status
+    setAiStatusMessage('Checking LM Studio...');
+    window.ipcRenderer.checkLMStudio()
+      .then((result: any) => {
+        if (result.success) {
+          setAiStatusMessage('LM Studio Connected');
+        } else {
+          setAiStatusMessage('LM Studio Disconnected');
+          alert('LM Studio not found. Please ensure LM Studio is running on localhost:1234');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to check LM Studio:', err);
+        setAiStatusMessage('Connection Error');
+      });
   };
 
   const handleRunExtraction = async () => {
@@ -182,12 +248,7 @@ function App() {
     setAnalysisProgress({ current: 0, total: indicesToAnalyze.length });
 
     try {
-      // Check if LM Studio is available
-      const isAvailable = await window.ipcRenderer.checkLMStudio();
-      if (!isAvailable) {
-        alert('LM Studio is not running. Please start LM Studio at http://localhost:1234');
-        return;
-      }
+      // (Optional) Ensure model is loaded - handled by handleModelChange mostly
 
       // Analyze each frame and update state progressively
       const newFrames = [...frames];
@@ -328,6 +389,62 @@ function App() {
   };
 
   /**
+   * Sequential Analysis (Analyze Flow) of ALL extracted frames
+   */
+  const handleAnalyzeFlow = async () => {
+    if (frames.length < 2 || !filePath) return;
+
+    setIsAnalyzingFlow(true);
+    setFlowProgress({ current: 0, total: frames.length - 1 });
+    setFlowResults(null);
+
+    try {
+      const imagePaths = frames.map(f => f.path);
+      const result = await window.ipcRenderer.compareSequential(imagePaths);
+
+      if (result.success && result.results) {
+        setFlowResults(result.results);
+      } else {
+        alert('Sequential analysis failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Flow analysis error:', error);
+      alert('An error occurred during flow analysis');
+    } finally {
+      setIsAnalyzingFlow(false);
+      setFlowProgress(undefined);
+    }
+  };
+
+  /**
+   * Export the sequential flow report
+   */
+  const handleExportFlowReport = async () => {
+    if (!flowResults || !filePath) return;
+
+    const data = {
+      source_video: filePath,
+      exported_at: new Date().toISOString(),
+      total_frames: frames.length,
+      sequential_comparisons: flowResults
+    };
+
+    const outputDir = filePath + '_extracted';
+
+    try {
+      const result = await window.ipcRenderer.exportFlowReport(outputDir, data);
+      if (result.success) {
+        alert(`Flow report exported to:\n${result.path}`);
+      } else {
+        alert('Export failed: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed');
+    }
+  };
+
+  /**
    * Export analyzed frames data to JSON file
    */
   const handleExportJson = async () => {
@@ -390,7 +507,8 @@ function App() {
       style={{
         minHeight: '100vh',
         backgroundColor: '#1e1e1e',
-        color: '#eee'
+        color: '#eee',
+        paddingBottom: '35px' // Space for status bar
       }}
     >
       {/* Application Header */}
@@ -424,6 +542,37 @@ function App() {
       </header>
 
       {/* Main Content */}
+      {/* Status Bar */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px 16px',
+        backgroundColor: '#1e1e1e',
+        borderBottom: '1px solid #333',
+        fontSize: '0.85rem'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <span style={{ color: '#aaa' }}>
+            Engine: <span style={{ color: aiStatusMessage.includes('Connected') ? '#4caf50' : '#f44336' }}>{aiStatusMessage}</span>
+          </span>
+          {analysisProgress && (
+            <span style={{ color: '#007AFF' }}>
+              Analyzing: {analysisProgress.current} / {analysisProgress.total}
+            </span>
+          )}
+          {flowProgress && (
+            <span style={{ color: '#6f42c1' }}>
+              Flow: {flowProgress.current} / {flowProgress.total}
+            </span>
+          )}
+        </div>
+        {filePath && (
+          <div style={{ color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>
+            {filePath}
+          </div>
+        )}
+      </div>
       {!filePath ? (
         <div style={{
           display: 'flex',
@@ -455,6 +604,12 @@ function App() {
               <span><strong>Codec:</strong> {videoInfo.codec}</span>
               <span><strong>Bitrate:</strong> {videoInfo.bitrate} kb/s</span>
               <span><strong>Total Frames:</strong> {videoInfo.totalFrames}</span>
+              <span style={{
+                color: aiStatusMessage.includes('Connected') ? '#4CAF50' : '#FF5252',
+                fontWeight: 'bold'
+              }}>
+                {aiStatusMessage}
+              </span>
             </div>
           )}
 
@@ -472,6 +627,11 @@ function App() {
             setExtractSceneChanges={setDoSceneChanges}
             onRunExtraction={handleRunExtraction}
             isProcessing={isProcessing}
+            selectedModel="LM Studio (Local API)"
+            onModelChange={handleModelChange}
+            onAnalyzeFlow={handleAnalyzeFlow}
+            isAnalyzingFlow={isAnalyzingFlow}
+            framesCount={frames.length}
           />
 
           {/* Thumbnail Grid - flexible height, scrolls with page */}
@@ -488,8 +648,17 @@ function App() {
             hasAnalyzedFrames={frames.some(f => f.isAnalyzed)}
           />
 
+          {/* Sequential Flow Report */}
+          {flowResults && (
+            <FlowReport
+              results={flowResults}
+              onClose={() => setFlowResults(null)}
+              onExport={handleExportFlowReport}
+            />
+          )}
+
           {/* Comparison Modal */}
-          {comparisonResult && (
+          {comparisonResult && comparisonResult.frame1 && comparisonResult.frame2 && (
             <ComparisonView
               frame1Path={comparisonResult.frame1}
               frame2Path={comparisonResult.frame2}
@@ -501,6 +670,37 @@ function App() {
           )}
         </>
       )}
+
+      {/* Status Bar */}
+      <footer style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        backgroundColor: '#007AFF', // Blue accent
+        color: 'white',
+        fontSize: '0.8rem',
+        padding: '5px 20px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        zIndex: 1000,
+        boxShadow: '0 -2px 5px rgba(0,0,0,0.2)'
+      }}>
+        <div style={{ display: 'flex', gap: '20px' }}>
+          <span><strong>AI Engine:</strong> LM Studio</span>
+          {isDescribing ? (
+            <span><strong>Status:</strong> Analyzing Frames...</span>
+          ) : isProcessing ? (
+            <span><strong>Status:</strong> Extracting Frames...</span>
+          ) : (
+            <span><strong>Status:</strong> {aiStatusMessage}</span>
+          )}
+        </div>
+        <div>
+          v1.0.0
+        </div>
+      </footer>
     </div>
   );
 }

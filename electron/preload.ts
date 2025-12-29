@@ -49,9 +49,12 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    * @param channel - The event channel name
    * @param listener - Callback function for events
    */
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+  on(channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) {
+    const subscription = (event: Electron.IpcRendererEvent, ...args: any[]) => listener(event, ...args)
+    ipcRenderer.on(channel, subscription)
+    return () => {
+      ipcRenderer.removeListener(channel, subscription)
+    }
   },
 
   /**
@@ -152,12 +155,14 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   // --------------------------------------------------------------------------
 
   /**
-   * Checks if LM Studio is running and accessible.
-   * 
-   * @returns Promise resolving to boolean
+   * Initialize Local AI model.
    */
-  checkLMStudio: () =>
-    ipcRenderer.invoke('check-lmstudio'),
+  initAI: (modelId: string) => ipcRenderer.invoke('ai-init', modelId),
+
+  /**
+   * Check if LM Studio is running. 
+   */
+  checkLMStudio: () => ipcRenderer.invoke('ai-init'),
 
   /**
    * Analyzes a single frame using LM Studio vision model.
@@ -211,4 +216,16 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    */
   exportComparisonJson: (outputDir: string, data: object) =>
     ipcRenderer.invoke('export-comparison-json', outputDir, data),
+
+  /**
+   * Compare multiple frames sequentially.
+   */
+  compareSequential: (imagePaths: string[]) =>
+    ipcRenderer.invoke('compare-sequential', imagePaths),
+
+  /**
+   * Export sequential flow report to a JSON file.
+   */
+  exportFlowReport: (outputDir: string, data: object) =>
+    ipcRenderer.invoke('export-flow-report', outputDir, data),
 })

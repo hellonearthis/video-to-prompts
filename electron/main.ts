@@ -16,7 +16,12 @@ import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo } from './ffmpeg'
-import { analyzeFrame, analyzeFramesBatch, checkLMStudioConnection, compareFrames } from './lmstudio'
+import {
+  analyzeFrame,
+  analyzeFramesBatch,
+  compareFrames,
+  checkLMStudioConnection
+} from './lmstudio'
 
 // ============================================================================
 // ESM Compatibility
@@ -224,49 +229,95 @@ app.whenReady().then(() => {
   // AI Analysis Handlers
   // --------------------------------------------------------------------------
 
+  // --------------------------------------------------------------------------
+  // AI Analysis Handlers (LM Studio)
+  // --------------------------------------------------------------------------
+
   /**
-   * Check if LM Studio is running and accessible.
-   * 
-   * @returns Boolean indicating if LM Studio is available
+   * Check LM Studio Connection.
+   * Instead of downloading a model, we verify the API is reachable.
    */
-  ipcMain.handle('check-lmstudio', async () => {
-    return await checkLMStudioConnection()
+  ipcMain.handle('ai-init', async () => {
+    try {
+      const isConnected = await checkLMStudioConnection();
+      if (isConnected) {
+        win?.webContents.send('ai-progress', { status: 'ready', data: 'LM Studio Connected' });
+        return { success: true };
+      } else {
+        win?.webContents.send('ai-progress', { status: 'error', data: 'LM Studio Not Found' });
+        return { success: false, error: 'LM Studio is not running on localhost:1234' };
+      }
+    } catch (error) {
+      console.error('[LM-STUDIO] Connection check failed:', error);
+      return { success: false, error: 'Connection failed' };
+    }
   })
 
   /**
-   * Analyze a single frame using LM Studio vision model.
-   * 
-   * @param imagePath - Path to the image file
-   * @returns Analysis result with summary, objects, tags, etc.
+   * Analyze a single frame using LM Studio.
    */
   ipcMain.handle('analyze-frame', async (_, imagePath) => {
-    return await analyzeFrame(imagePath)
+    return await analyzeFrame(imagePath);
   })
 
   /**
-   * Analyze multiple frames in batch.
-   * Sends progress updates to renderer via webContents.
-   * 
-   * @param imagePaths - Array of image file paths
-   * @returns Array of analysis results
+   * Analyze multiple frames in batch using LM Studio.
    */
   ipcMain.handle('analyze-frames-batch', async (_, imagePaths: string[]) => {
-    const results = await analyzeFramesBatch(imagePaths, (current, total, result) => {
-      // Send progress update to renderer
-      win?.webContents.send('analysis-progress', { current, total, result })
-    })
-    return results
+    return await analyzeFramesBatch(imagePaths, (current, total, result) => {
+      // Notify progress to renderer
+      win?.webContents.send('analysis-progress', { current, total, result });
+    });
   })
 
   /**
-   * Compare two frames to analyze action and flow.
-   * 
-   * @param frame1Path - Path to the first frame
-   * @param frame2Path - Path to the second frame
-   * @returns Comparison result
+   * Compare two frames using LM Studio.
    */
   ipcMain.handle('compare-frames', async (_, frame1Path: string, frame2Path: string) => {
-    return await compareFrames(frame1Path, frame2Path)
+    return await compareFrames(frame1Path, frame2Path);
+  })
+
+  /**
+   * Compare multiple frames sequentially (1->2, 2->3, etc.)
+   */
+  ipcMain.handle('compare-sequential', async (_, imagePaths: string[]) => {
+    if (imagePaths.length < 2) {
+      return { success: false, error: 'At least two frames are required for sequential analysis' };
+    }
+
+    const results = [];
+    for (let i = 0; i < imagePaths.length - 1; i++) {
+      try {
+        const frame1 = imagePaths[i];
+        const frame2 = imagePaths[i + 1];
+        const comparisonResult = await compareFrames(frame1, frame2);
+
+        results.push({
+          index: i,
+          frame1,
+          frame2,
+          comparison: comparisonResult.comparison,
+          error: comparisonResult.error
+        });
+
+        // Notify progress (1-based index for easier UI display)
+        win?.webContents.send('flow-analysis-progress', {
+          current: i + 1,
+          total: imagePaths.length - 1,
+          result: { success: comparisonResult.success, frame1, frame2, comparison: comparisonResult.comparison, error: comparisonResult.error }
+        });
+
+      } catch (error) {
+        console.error(`[LM-STUDIO] Sequential analysis failed at pair ${i}:`, error);
+        results.push({
+          index: i,
+          frame1: imagePaths[i],
+          frame2: imagePaths[i + 1],
+          error: error instanceof Error ? error.message : 'Comparison failed'
+        });
+      }
+    }
+    return { success: true, results };
   })
 
   // --------------------------------------------------------------------------
@@ -318,6 +369,28 @@ app.whenReady().then(() => {
       return { success: true, path: filePath }
     } catch (error) {
       console.error('[EXPORT] Failed to save comparison:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to save file'
+      }
+    }
+  })
+
+  /**
+   * Export sequential flow report to a JSON file.
+   */
+  ipcMain.handle('export-flow-report', async (_, outputDir: string, data: object) => {
+    const fs = await import('fs/promises')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const filename = `flow_report_${timestamp}.json`
+    const filePath = path.join(outputDir, filename)
+
+    try {
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+      console.log('[EXPORT] Flow report saved to:', filePath)
+      return { success: true, path: filePath }
+    } catch (error) {
+      console.error('[EXPORT] Failed to save flow report:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to save file'

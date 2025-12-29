@@ -35,15 +35,27 @@ Frame comparisons include:
 
 - **Node.js 18+**
 - **LM Studio** running locally at `http://localhost:1234`
-  - Recommended model: `qwen/qwen3-vl-4b` (vision model with multi-image support)
+  - **Model**: Requires a vision-capable model (e.g., `qwen/qwen3-vl-4b` or `llava`)
+  - **Local Server**: Must have the "Local Server" started in LM Studio.
 
 ## Getting Started
 
-### Installation
+### 1. LM Studio Setup
+1. Download and install [LM Studio](https://lmstudio.ai/).
+2. Search for and download a vision model (recommend: `qwen/qwen3-vl-4b`).
+3. Go to the **Local Server** tab (↔️ icon).
+4. Load the vision model and click **Start Server**.
+5. Ensure the server is running on port `1234`.
 
+### 2. Application Installation
 ```bash
 npm install
 ```
+
+### 3. Cleanup (If upgrading from v1.0)
+If you previously used the Transformers.js version, you can reclaim several GBs of space:
+1. Delete the `%AppData%\YourAppName\models` folder.
+2. Delete `%USERPROFILE%\.cache\huggingface` if not needed for other tools.
 
 ### Development
 
