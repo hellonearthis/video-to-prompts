@@ -24,3 +24,13 @@ release
 *.njsproj
 *.sln
 *.sw?
+
+# Video Processing Artifacts
+*_extracted/
+*.mp4
+*.mov
+*.avi
+*.mkv
+
+# OS Files
+Thumbs.db
