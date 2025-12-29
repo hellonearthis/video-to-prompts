@@ -100,9 +100,12 @@ interface Window {
         checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
         initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;
         analyzeFrame: (imagePath: string) => Promise<AnalysisResult>;
-        analyzeFramesBatch: (imagePaths: string[]) => Promise<AnalysisResult[]>;
-        compareFrames: (frame1Path: string, frame2Path: string) => Promise<FrameComparisonResult>;
-        compareSequential: (imagePaths: string[]) => Promise<FlowAnalysisResult>;
+        analyzeFramesBatch: (paths: string[]) => Promise<any>;
+        compareFrames: (f1: string, f2: string) => Promise<any>;
+        compareSequential: (paths: string[]) => Promise<{ success: boolean; results?: any[]; error?: string }>;
+        analyzeStorySequence: (paths: string[]) => Promise<{ success: boolean; analysis?: any; error?: string }>;
+        onAiProgress: (callback: (data: any) => void) => void;
+        onAnalysisProgress: (callback: (data: any) => void) => void;
         exportAnalysisJson: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
         exportComparisonJson: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
         exportFlowReport: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
@@ -110,4 +113,3 @@ interface Window {
         off: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
     }
 }
-

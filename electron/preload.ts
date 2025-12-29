@@ -224,6 +224,16 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     ipcRenderer.invoke('compare-sequential', imagePaths),
 
   /**
+   * Analyzes a sequence of frames to understand the narrative flow.
+   * // Narrative Pipeline
+   * 
+   * @param imagePaths - Array of image file paths representing the sequence
+   * @returns Promise resolving to analysis result
+   */
+  analyzeStorySequence: (imagePaths: string[]) =>
+    ipcRenderer.invoke('analyze-story-sequence', imagePaths),
+
+  /**
    * Export sequential flow report to a JSON file.
    */
   exportFlowReport: (outputDir: string, data: object) =>

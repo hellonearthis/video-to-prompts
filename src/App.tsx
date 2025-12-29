@@ -16,6 +16,8 @@ import { ControlPanel } from './components/ControlPanel';
 import { ThumbnailGrid, FrameData } from './components/ThumbnailGrid';
 import { ComparisonView } from './components/ComparisonView';
 import { FlowReport } from './components/FlowReport';
+import { StoryboardView, SceneAnalysis } from './components/StoryboardView';
+import { TimelineStrip } from './components/TimelineStrip';
 
 /**
  * Video metadata type (matches VideoInfo from backend)
@@ -49,7 +51,7 @@ function App() {
   // --------------------------------------------------------------------------
 
   /** Frames per second to extract */
-  const [fps, setFps] = useState(1);
+  const [fps, setFps] = useState(3);
 
   /** Scene detection threshold */
   const [threshold, setThreshold] = useState(0.3);
@@ -61,7 +63,7 @@ function App() {
   const [doKeyframes, setDoKeyframes] = useState(false);
 
   /** Whether to extract scene change frames */
-  const [doSceneChanges, setDoSceneChanges] = useState(true);
+  const [doSceneChanges, setDoSceneChanges] = useState(false);
 
   // --------------------------------------------------------------------------
   // Loading States
@@ -94,6 +96,9 @@ function App() {
   const [flowResults, setFlowResults] = useState<FlowPairResult[] | null>(null);
   const [isAnalyzingFlow, setIsAnalyzingFlow] = useState(false);
   const [flowProgress, setFlowProgress] = useState<{ current: number, total: number } | undefined>();
+
+  const [storyboardOpen, setStoryboardOpen] = useState(false);
+  const [storyboardFrames, setStoryboardFrames] = useState<string[]>([]);
 
   // --------------------------------------------------------------------------
   // AI Model State (LM Studio)
@@ -256,6 +261,11 @@ function App() {
       for (let i = 0; i < indicesToAnalyze.length; i++) {
         const frameIndex = indicesToAnalyze[i];
         const frame = newFrames[frameIndex];
+
+        if (!frame) {
+          console.warn(`Frame at index ${frameIndex} is undefined. Skipping.`);
+          continue;
+        }
 
         setAnalysisProgress({ current: i + 1, total: indicesToAnalyze.length });
 
@@ -444,6 +454,84 @@ function App() {
     }
   };
 
+  const [storyTimeline, setStoryTimeline] = useState<SceneAnalysis[]>([]);
+  const [cachedAnalysis, setCachedAnalysis] = useState<SceneAnalysis | null>(null);
+
+  // --------------------------------------------------------------------------
+  // Storyboard Logic
+  // --------------------------------------------------------------------------
+
+  /**
+   * Handle Story Analysis for selected frames
+   */
+  const handleAnalyzeStory = () => {
+    const selectedPaths = Array.from(selectedIndices)
+      .sort((a, b) => a - b)
+      .map(idx => frames[idx].path);
+
+    if (selectedPaths.length < 2) return;
+
+    setStoryboardFrames(selectedPaths);
+    setStoryboardOpen(true);
+  };
+
+  /**
+   * Save a completed scene analysis to the timeline
+   */
+  const handleSaveToTimeline = (analysis: SceneAnalysis) => {
+    setStoryTimeline(prev => [...prev, analysis]);
+    console.log("Added to timeline:", analysis);
+  };
+
+  /**
+   * Export a single scene's analysis
+   */
+  const handleExportScene = async (analysis: SceneAnalysis) => {
+    if (!filePath) return;
+    const outputDir = filePath + '_extracted';
+
+    // Create a specific filename structure for scenes
+    const safeId = analysis.scene_id.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const filename = `story_scene_${safeId}_${Date.now()}`;
+
+    try {
+      // We reuse the generic JSON export but could create a specific one if needed
+      const result = await window.ipcRenderer.exportAnalysisJson(outputDir, {
+        ...analysis,
+        filename // Suggestion for the backend if it supported it, but it likely uses a fixed name or generic
+      });
+      // Note: The backend 'export-analysis-json' creates 'analysis_results.json'.
+      // We might want to update the backend to accept a filename, or just let it update the generic one.
+      // For now, let's just dump it.
+
+      if (result.success) {
+        alert(`Analysis exported to:\n${result.path}`);
+      } else {
+        alert(`Export failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("Export error", error);
+      alert("Export failed");
+    }
+  };
+
+  const handleRemoveFromTimeline = (index: number) => {
+    setStoryTimeline(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleViewTimelineScene = (scene: SceneAnalysis) => {
+    // Re-hydrate the storyboard view with stored data
+    // We need to set frames and open the view, but also Pre-Load the analysis
+    if (scene.frames) {
+      setStoryboardFrames(scene.frames);
+      // TODO: Ideally we pass the PRE-EXISTING analysis to the view so it doesn't re-run
+      // For now, let's just create a state for "cachedAnalysis" in App and pass it down
+      // Or we can modify StoryboardView to accept an `initialAnalysis` prop
+      setStoryboardOpen(true);
+    }
+  };
+
+
   /**
    * Export analyzed frames data to JSON file
    */
@@ -467,7 +555,9 @@ function App() {
           tags: f.tags,
           scene_type: f.scene_type,
           visual_elements: f.visual_elements
-        }))
+        })),
+      // Include the story timeline in the main export
+      story_timeline: storyTimeline
     };
 
     // Export to the same folder as extracted frames
@@ -613,6 +703,13 @@ function App() {
             </div>
           )}
 
+          {/* Timeline Strip */}
+          <TimelineStrip
+            timeline={storyTimeline}
+            onRemoveScene={handleRemoveFromTimeline}
+            onViewScene={handleViewTimelineScene}
+          />
+
           {/* Control Panel */}
           <ControlPanel
             fps={fps}
@@ -646,6 +743,7 @@ function App() {
             isDescribing={isDescribing}
             analysisProgress={analysisProgress}
             hasAnalyzedFrames={frames.some(f => f.isAnalyzed)}
+            onAnalyzeStory={handleAnalyzeStory}
           />
 
           {/* Sequential Flow Report */}
@@ -656,6 +754,16 @@ function App() {
               onExport={handleExportFlowReport}
             />
           )}
+
+          {/* Storyboard View */}
+          <StoryboardView
+            isOpen={storyboardOpen}
+            onClose={() => setStoryboardOpen(false)}
+            framePaths={storyboardFrames}
+            onSaveToTimeline={handleSaveToTimeline}
+            onExport={handleExportScene}
+            initialAnalysis={cachedAnalysis}
+          />
 
           {/* Comparison Modal */}
           {comparisonResult && comparisonResult.frame1 && comparisonResult.frame2 && (

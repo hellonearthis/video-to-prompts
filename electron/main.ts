@@ -320,6 +320,14 @@ app.whenReady().then(() => {
     return { success: true, results };
   })
 
+  /**
+   * Analyze a story sequence (batch of frames) for narrative structure.
+   */
+  ipcMain.handle('analyze-story-sequence', async (_, imagePaths: string[]) => {
+    const { analyzeSequence } = await import('./lmstudio'); // dynamic import
+    return await analyzeSequence(imagePaths);
+  })
+
   // --------------------------------------------------------------------------
   // Export Handlers
   // --------------------------------------------------------------------------

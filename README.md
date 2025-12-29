@@ -16,7 +16,9 @@ A desktop application that breaks down video clips into important visual compone
 - **Frame Selection**: Click to select frames, Ctrl/Cmd+Click for multi-select, Shift+Click for range
 - **Analyze Selected/All**: Generate AI descriptions for individual frames
 - **Frame Comparison**: Select 2 frames to analyze the *action* and *object flow* between them
-- **Export to JSON**: Save all analysis data or comparison results
+- **Sequential Flow Analysis**: Select multiple frames (3+) to analyze the continuous flow of action and changes across the sequence
+- **Story Director's Cut**: Select multiple frames to generate a narrative storyboard, with AI-suggested panel layouts and narrative arc analysis
+- **Export to JSON**: Save all analysis data, comparison results, or full story timelines
 
 ### AI Analysis Output
 Each analyzed frame includes:
@@ -30,6 +32,12 @@ Frame comparisons include:
 - **Action Description**: What's happening between frames
 - **Object Flow**: How objects moved or changed
 - **Differences**: Key visual differences
+
+Story Analysis includes:
+- **Narrative Arc**: "What happened", "The Change", and "Implied Subtext"
+- **Key Entities**: Main characters and their roles (Protagonist/Antagonist)
+- **Story Signals**: Importance score, agency, and emotional shifts
+- **Panel Guidance**: AI-suggested comic panel layout, selecting the *best* frames for specific beats
 
 ## Requirements
 
@@ -81,13 +89,18 @@ npm run build
 5. **Analyze frames**:
    - Click **"Analyze Selected"** to analyze only selected frames
    - Click **"Analyze All"** to analyze every frame
-6. **Compare two frames**:
+6. **Compare two frames (Action Analysis)**:
    - Select exactly 2 frames
    - Click **"Compare Action"** (purple button)
    - View the side-by-side comparison with AI analysis
-7. **Export results**:
+7. **Analyze Story (Director's Cut)**:
+   - Select multiple frames (2+) that form a scene
+   - Click **"Analyze Story"** (in the action bar)
+   - View the narrative breakdown and AI-suggested panel layout
+   - **Add to Timeline**: Save the scene to your session timeline
+8. **Export results**:
    - **"Export JSON"**: Saves all analyzed frame data
-   - **"Export to JSON"** (in comparison view): Saves comparison result
+   - **"Export to JSON"** (in comparison/story view): Saves specific analysis results
 
 ## Project Structure
 
@@ -107,7 +120,10 @@ Video to Prompts/
 │       ├── FilePicker.tsx      # Video file selection component
 │       ├── ControlPanel.tsx    # Extraction settings controls
 │       ├── ThumbnailGrid.tsx   # Frame display grid with selection
-│       └── ComparisonView.tsx  # Frame comparison modal
+│       ├── ComparisonView.tsx  # Frame comparison modal
+│       ├── StoryboardView.tsx  # Narrative analysis & panel layout view
+│       ├── TimelineStrip.tsx   # Visual timeline of saved scenes
+│       └── FlowReport.tsx      # Sequential action flow report
 ├── package.json                 # Dependencies and scripts
 ├── vite.config.ts              # Vite bundler configuration
 └── tsconfig.json               # TypeScript configuration
@@ -134,8 +150,9 @@ Video to Prompts/
 5. **User selects frames** for AI analysis
 6. **LM Studio analyzes frames** via local API:
    - Single frames: Generates summary, objects, tags, scene type
-   - Two frames: Analyzes action, object flow, and differences
-7. **Results can be exported** to JSON for further use
+   - Fram Pairs: Analyzes action, object flow, and differences
+   - Sequences: Generates narrative storyboards and panel layouts
+7. **Results can be exported** or saved to the timeline
 
 ## JSON Export Format
 

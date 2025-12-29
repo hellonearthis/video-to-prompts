@@ -53,6 +53,7 @@ interface ThumbnailGridProps {
     onAnalyzeAll: () => void;
     onExportJson: () => void;
     onCompareSelected: () => void;
+    onAnalyzeStory: () => void;
     isDescribing: boolean;
     analysisProgress?: { current: number; total: number };
     hasAnalyzedFrames: boolean;
@@ -70,6 +71,8 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
     onAnalyzeAll,
     onExportJson,
     onCompareSelected,
+
+    onAnalyzeStory,
     isDescribing,
     analysisProgress,
     hasAnalyzedFrames
@@ -204,6 +207,23 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                     </button>
 
                     <button
+                        onClick={onAnalyzeStory}
+                        disabled={selectedIndices.size < 2 || isDescribing}
+                        style={{
+                            padding: '6px 12px',
+                            backgroundColor: selectedIndices.size >= 2 ? '#6f42c1' : '#555',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: selectedIndices.size < 2 || isDescribing ? 'not-allowed' : 'pointer',
+                            opacity: selectedIndices.size < 2 || isDescribing ? 0.6 : 1
+                        }}
+                        title="Select at least 2 frames for narrative analysis"
+                    >
+                        Analyze Story
+                    </button>
+
+                    <button
                         onClick={onAnalyzeAll}
                         disabled={isDescribing}
                         style={{
@@ -246,6 +266,8 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
             }}>
                 {frames.map((frame, index) => {
                     const isSelected = selectedIndices.has(index);
+
+                    if (!frame || !frame.path) return null;
 
                     return (
                         <div

@@ -375,3 +375,186 @@ function getMimeType(filePath: string): string {
     };
     return mimeTypes[ext] || 'image/png';
 }
+
+// ============================================================================
+// Narrative Storyboard Analysis
+// ============================================================================
+
+export interface KeyEntity {
+    name: string;
+    type: "person" | "object" | "animal";
+    role: "protagonist" | "antagonist" | "context";
+    description: string;
+}
+
+export interface StoryboardSignal {
+    importance: number; // 0-10
+    agency: "none" | "reaction" | "decision" | "action" | "failure" | "realisation";
+    irreversible: boolean;
+    emotional_shift: { from: string; to: string };
+}
+
+export interface PanelGuidance {
+    panel_count: number;
+    panels: {
+        panel_index: number;
+        role: string;
+        description: string;
+        best_frame_index: number; // 0-based index of the input frame that best represents this panel
+    }[];
+    omit_literal_action: boolean;
+}
+
+export interface SceneAnalysis {
+    scene_id: string;
+    summary: {
+        what_happened: string;
+        change: string;
+        implied: string;
+        uncertainty: string;
+    };
+    key_entities: KeyEntity[];
+    story_signals: StoryboardSignal;
+    panel_guidance: PanelGuidance;
+    confidence: number;
+}
+
+export interface SequenceAnalysisResult {
+    success: boolean;
+    analysis?: SceneAnalysis;
+    error?: string;
+}
+
+/**
+ * Analyzes a sequence of frames to infer narrative beats and generate storyboard guidance.
+ * This uses the "Story Witness" prompting strategy.
+ * 
+ * @param framePaths - Array of 3-6 ordered image paths representing a scene
+ */
+export const analyzeSequence = async (framePaths: string[]): Promise<SequenceAnalysisResult> => {
+    console.log(`[LM-STUDIO] Analyzing sequence of ${framePaths.length} frames`);
+
+    if (framePaths.length < 2) {
+        return { success: false, error: "Sequence analysis requires at least 2 frames." };
+    }
+
+    try {
+        // Prepare image content for the payload
+        // Prepare image content for the payload
+        const content: any[] = [
+            { type: "text", text: "Analyze this sequence of frames." }
+        ];
+
+        const imageContent = framePaths.map((fp, index) => {
+            if (!fs.existsSync(fp)) throw new Error(`File not found: ${fp}`);
+            const dims = fp.split('.');
+            const ext = dims[dims.length - 1]; // minimal ext check
+            const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+            const b64 = fs.readFileSync(fp).toString('base64');
+
+            return [
+                { type: "text", text: `Frame ${index + 1}:` },
+                { type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } }
+            ];
+        }).flat();
+
+        content.push(...imageContent);
+
+        // "Story Witness" System Prompt
+        // Designed to force the model to look *between* the frames for narrative glue.
+        const storyWitnessPrompt = `You are a STORY WITNESS and EXPERT CINEMATOGRAPHER.
+You are viewing a sequence of ${framePaths.length} frames (indexed 0 to ${framePaths.length - 1}) from a video scene.
+Your task is to analyze the narrative flow, character actions, and story beats.
+
+RESPONSE FORMAT: JSON ONLY.
+
+Analyze the sequence to produce:
+1.  **Narrative Summary**:
+    *   \`what_happened\`: Concise objective summary of the action.
+    *   \`change\`: What state changed from start to end?
+    *   \`implied\`: What actions likely happened *between* frames?
+    *   \`uncertainty\`: What is ambiguous?
+
+2.  **Key Entities**: Identify main characters/objects found in the frames.
+
+3.  **Story Signals**:
+    *   Importance (0-10): How critical is this moment?
+    *   Agency: Who is driving the action?
+    *   Emotional Shift: e.g., "Neutral -> Anxious"
+
+4.  **Panel Guidance (Crucial)**:
+    *   Propose a comic-book style panel layout.
+    *   **Select the Best Frames**: You MUST choose which specific frame index (0, 1, 2...) best represents each narrative beat.
+    *   **Selection Criteria**: 
+        *   Choose the frame that contains the **PEAK ACTION** or **CLEAREST EMOTION**.
+        *   Do NOT just pick the first available frame.
+        *   If the provided frames don't perfectly match the beat, pick the closest one that provides visual evidence.
+    *   Create enough panels to tell the full story shown in the images.
+
+SCHEMA:
+{
+  "scene_id": "auto_generated_id",
+  "summary": { "what_happened": "...", "change": "...", "implied": "...", "uncertainty": "..." },
+  "key_entities": [ { "name": "...", "type": "person/object", "role": "protagonist/antagonist", "description": "..." } ],
+  "story_signals": {
+    "importance": 0-10,
+    "agency": "string",
+    "irreversible": boolean,
+    "emotional_shift": { "from": "...", "to": "..." }
+  },
+  "panel_guidance": {
+    "panel_count": number,
+    "panels": [
+       { 
+         "panel_index": 0, 
+         "role": "Setup/Action/Reaction", 
+         "description": "Visual description of this panel", 
+         "best_frame_index": number 
+       }
+    ],
+    "omit_literal_action": boolean
+  },
+  "confidence": 0-1 (float)
+}
+`;
+
+        const response = await fetch(LM_STUDIO_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: "local-model",
+                messages: [
+                    {
+                        role: "system",
+                        content: storyWitnessPrompt
+                    },
+                    {
+                        role: "user",
+                        content: content
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 1000
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`LM Studio API Error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        let text = result.choices[0].message.content;
+
+        // Clean markdown
+        text = text.replace(/```json\n ? /g, '').replace(/```\n?/g, '').trim();
+
+        const analysis: SceneAnalysis = JSON.parse(text);
+
+        console.log('[LM-STUDIO] Sequence analysis complete.');
+        return { success: true, analysis };
+
+    } catch (error) {
+        console.error('[LM-STUDIO] Sequence analysis failed:', error);
+        return { success: false, error: String(error) };
+    }
+};
