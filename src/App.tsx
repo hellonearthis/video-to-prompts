@@ -294,15 +294,6 @@ function App() {
   };
 
   /**
-   * Core function to analyze frames using LM Studio
-   */
-  const analyzeFrames = async (indicesToAnalyze: number[]) => {
-    if (indicesToAnalyze.length === 0) return;
-
-    setIsDescribing(true);
-    setAnalysisProgress({ current: 0, total: indicesToAnalyze.length });
-
-    try {
       // (Optional) Ensure model is loaded - handled by handleModelChange mostly
 
       // Analyze each frame and update state progressively
@@ -418,16 +409,10 @@ function App() {
         console.log("Auto-synced scene in timeline:", analysis.scene_id);
         return newTimeline;
       }
-      return prev;
+      // Add new scene
+      console.log("Added new scene to timeline:", analysis.scene_id);
+      return [...prev, analysis];
     });
-  };
-
-  /**
-   * Save a completed scene analysis to the timeline
-   */
-  const handleSaveToTimeline = (analysis: SceneAnalysis) => {
-    setStoryTimeline(prev => [...prev, analysis]);
-    console.log("Added to timeline:", analysis);
   };
 
   /**
@@ -597,6 +582,7 @@ function App() {
             onExport={handleExportScene}
             initialAnalysis={cachedAnalysis}
             onAnalysisComplete={handleAnalysisComplete}
+            timeline={storyTimeline}
           />
         </>
       )}

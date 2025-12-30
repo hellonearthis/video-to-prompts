@@ -9,6 +9,7 @@ interface StoryboardViewProps {
     onExport: (analysis: SceneAnalysis) => void;
     initialAnalysis?: SceneAnalysis | null;
     onAnalysisComplete?: (analysis: SceneAnalysis) => void;
+    timeline: SceneAnalysis[];
 }
 
 export interface SceneAnalysis {
@@ -48,7 +49,7 @@ export interface SceneAnalysis {
 }
 
 export const StoryboardView: React.FC<StoryboardViewProps> = ({
-    isOpen, onClose, framePaths, onSaveToTimeline, onExport, initialAnalysis, onAnalysisComplete
+    isOpen, onClose, framePaths, onSaveToTimeline, onExport, initialAnalysis, onAnalysisComplete, timeline
 }) => {
     const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
     const [loading, setLoading] = useState(false);
@@ -147,7 +148,7 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                     }}
                                     className="btn-primary btn-purple"
                                 >
-                                    💾 Add to Timeline
+                                    {timeline.some(s => s.scene_id === analysis.scene_id) ? '💾 Update Timeline' : '💾 Add to Timeline'}
                                 </button>
                             </>
                         )}
