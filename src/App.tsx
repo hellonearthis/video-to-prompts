@@ -409,6 +409,23 @@ function App() {
         console.log("Auto-synced scene in timeline:", analysis.scene_id);
         return newTimeline;
       }
+      return prev;
+    });
+  };
+
+  /**
+   * Save a completed scene analysis to the timeline (Upsert)
+   */
+  const handleSaveToTimeline = (analysis: SceneAnalysis) => {
+    setStoryTimeline(prev => {
+      const index = prev.findIndex(s => s.scene_id === analysis.scene_id);
+      if (index !== -1) {
+        // Update existing scene
+        const newTimeline = [...prev];
+        newTimeline[index] = analysis;
+        console.log("Updated scene in timeline:", analysis.scene_id);
+        return newTimeline;
+      }
       // Add new scene
       console.log("Added new scene to timeline:", analysis.scene_id);
       return [...prev, analysis];
