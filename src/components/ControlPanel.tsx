@@ -1,21 +1,5 @@
-/**
- * ControlPanel Component
- * 
- * A settings panel for configuring video frame extraction options.
- * 
- * Features:
- * - Frames per second (FPS) input for time-based extraction rate
- * - Scene detection threshold slider (0.1 - 1.0)
- * - Checkbox toggles for extraction modes:
- *   - Time Frames: Extract frames at regular time intervals
- *   - Keyframes: Extract actual video keyframes (I-frames)
- *   - Scene Changes: Extract frames where scene changes detected
- * - Run Extraction button with loading state
- * 
- * The panel is disabled during processing to prevent conflicting operations.
- */
-
 import React from 'react';
+import './ControlPanel.css';
 
 // ============================================================================
 // Type Definitions
@@ -58,14 +42,9 @@ interface ControlPanelProps {
     /** Whether extraction is currently in progress */
     isProcessing: boolean;
 
-    /** Currently selected AI model ID (Now fixed to LM Studio) */
     selectedModel: string;
     /** Callback to update selected model */
     onModelChange: () => void;
-    /** Callback to trigger sequential flow analysis */
-    onAnalyzeFlow: () => void;
-    /** Whether flow analysis is in progress */
-    isAnalyzingFlow: boolean;
 }
 
 // ============================================================================
@@ -87,28 +66,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     isProcessing,
     selectedModel,
     onModelChange,
-    onAnalyzeFlow,
-    isAnalyzingFlow,
     framesCount
 }) => {
     return (
-        <div style={{
-            padding: '15px 20px',
-            borderBottom: '1px solid #444',
-            display: 'flex',
-            gap: '20px',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            backgroundColor: '#2d2d2d'
-        }}>
+        <div className="control-panel-container">
 
             {/* --------------------------------------------------------------------------
           Frames Per Second Input
-          
-          Controls how many frames per second to extract in time-based mode.
           -------------------------------------------------------------------------- */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <label htmlFor="fps" style={{ fontSize: '0.8rem', color: '#aaa' }}>FPS (Time-based)</label>
+            <div className="control-group">
+                <label htmlFor="fps" className="control-label">FPS (Time-based)</label>
                 <input
                     id="fps"
                     type="number"
@@ -118,22 +85,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     value={fps}
                     onChange={(e) => setFps(parseFloat(e.target.value) || 1)}
                     disabled={isProcessing}
-                    style={{
-                        width: '60px',
-                        padding: '4px 8px',
-                        backgroundColor: '#1e1e1e',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        color: '#eee'
-                    }}
+                    className="control-input-number"
                 />
             </div>
 
             {/* --------------------------------------------------------------------------
           Scene Detection Threshold Slider
           -------------------------------------------------------------------------- */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <label htmlFor="threshold" style={{ fontSize: '0.8rem', color: '#aaa' }}>
+            <div className="control-group">
+                <label htmlFor="threshold" className="control-label">
                     Scene Threshold: {threshold}
                 </label>
                 <input
@@ -145,21 +105,15 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     value={threshold}
                     onChange={(e) => setThreshold(parseFloat(e.target.value))}
                     disabled={isProcessing}
-                    style={{ width: '120px' }}
+                    className="control-input-range"
                 />
             </div>
 
             {/* --------------------------------------------------------------------------
           Extraction Mode Checkboxes
           -------------------------------------------------------------------------- */}
-            <div style={{ display: 'flex', gap: '15px' }}>
-                <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem'
-                }}>
+            <div className="checkbox-group">
+                <label className="checkbox-label">
                     <input
                         type="checkbox"
                         checked={extractTimeFrames}
@@ -169,13 +123,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     Time Frames
                 </label>
 
-                <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem'
-                }}>
+                <label className="checkbox-label">
                     <input
                         type="checkbox"
                         checked={extractKeyframes}
@@ -185,13 +133,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     Keyframes
                 </label>
 
-                <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem'
-                }}>
+                <label className="checkbox-label">
                     <input
                         type="checkbox"
                         checked={extractSceneChanges}
@@ -205,20 +147,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* --------------------------------------------------------------------------
               AI Model / API Status
               -------------------------------------------------------------------------- */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                <label style={{ fontSize: '0.8rem', color: '#aaa' }}>AI Engine</label>
+            <div className="control-group">
+                <label className="control-label">AI Engine</label>
                 <button
                     onClick={onModelChange}
                     disabled={isProcessing}
-                    style={{
-                        padding: '4px 12px',
-                        backgroundColor: '#1e1e1e',
-                        border: '1px solid #444',
-                        borderRadius: '4px',
-                        color: '#eee',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem'
-                    }}
+                    className="btn-model-refresh"
                 >
                     {selectedModel} (Refresh)
                 </button>
@@ -227,35 +161,11 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* --------------------------------------------------------------------------
           Run Extraction Button
           -------------------------------------------------------------------------- */}
-            <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
-                <button
-                    onClick={onAnalyzeFlow}
-                    disabled={isProcessing || isAnalyzingFlow || framesCount < 2}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: (isProcessing || isAnalyzingFlow) ? '#555' : '#6f42c1',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: (isProcessing || isAnalyzingFlow) ? 'not-allowed' : 'pointer',
-                        fontWeight: 'bold',
-                    }}
-                >
-                    {isAnalyzingFlow ? 'Analyzing Flow...' : 'Analyze Flow'}
-                </button>
-
+            <div className="action-group">
                 <button
                     onClick={onRunExtraction}
-                    disabled={isProcessing || isAnalyzingFlow || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges)}
-                    style={{
-                        padding: '8px 16px',
-                        backgroundColor: isProcessing ? '#555' : '#007AFF',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: isProcessing ? 'not-allowed' : 'pointer',
-                        fontWeight: 'bold',
-                    }}
+                    disabled={isProcessing || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges)}
+                    className="btn-run-extraction"
                 >
                     {isProcessing ? 'Extracting...' : 'Run Extraction'}
                 </button>

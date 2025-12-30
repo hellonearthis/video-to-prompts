@@ -14,8 +14,6 @@ import './App.css';
 import { FilePicker } from './components/FilePicker';
 import { ControlPanel } from './components/ControlPanel';
 import { ThumbnailGrid, FrameData } from './components/ThumbnailGrid';
-import { ComparisonView } from './components/ComparisonView';
-import { FlowReport } from './components/FlowReport';
 import { StoryboardView, SceneAnalysis } from './components/StoryboardView';
 import { TimelineStrip } from './components/TimelineStrip';
 
@@ -83,28 +81,35 @@ function App() {
   const [analysisProgress, setAnalysisProgress] = useState<{ current: number; total: number } | undefined>();
 
   /** Comparison result */
-  const [comparisonResult, setComparisonResult] = useState<{
-    frame1: string;
-    frame2: string;
-    result: ComparisonResult;
-  } | null>(null);
-
-  /** Is comparison exporting */
-  const [isExportingComparison, setIsExportingComparison] = useState(false);
+  // Removed comparison logic
 
   /** Sequential flow analysis results */
-  const [flowResults, setFlowResults] = useState<FlowPairResult[] | null>(null);
-  const [isAnalyzingFlow, setIsAnalyzingFlow] = useState(false);
-  const [flowProgress, setFlowProgress] = useState<{ current: number, total: number } | undefined>();
+  // Removed flow results logic
 
   const [storyboardOpen, setStoryboardOpen] = useState(false);
   const [storyboardFrames, setStoryboardFrames] = useState<string[]>([]);
+  const [storyTimeline, setStoryTimeline] = useState<SceneAnalysis[]>([]);
+  const [cachedAnalysis, setCachedAnalysis] = useState<SceneAnalysis | null>(null);
 
   // --------------------------------------------------------------------------
   // AI Model State (LM Studio)
   // --------------------------------------------------------------------------
 
   const [aiStatusMessage, setAiStatusMessage] = useState<string>('Checking LM Studio...');
+
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false);
+  const [existingFramesCount, setExistingFramesCount] = useState(0);
+
+  // Auto-save timeline when it changes
+  useEffect(() => {
+    const saveTimeline = async () => {
+      if (filePath && storyTimeline.length > 0) {
+        const outputDir = filePath + '_extracted';
+        await window.ipcRenderer.saveStoryTimeline(outputDir, storyTimeline);
+      }
+    };
+    saveTimeline();
+  }, [storyTimeline, filePath]);
 
   // ============================================================================
   // Effects
@@ -129,13 +134,8 @@ function App() {
       setAnalysisProgress({ current: data.current, total: data.total });
     });
 
-    const removeFlow = window.ipcRenderer.on('flow-analysis-progress', (_event, data: any) => {
-      setFlowProgress({ current: data.current, total: data.total });
-    });
-
     return () => {
       removeSingle();
-      removeFlow();
     };
   }, []);
 
@@ -185,11 +185,24 @@ function App() {
       });
   };
 
-  const handleRunExtraction = async () => {
+  const handleRunExtraction = async (forceNew = false) => {
     if (!filePath) return;
+
+    const outputDir = filePath + '_extracted';
+
+    // Step 1: Check if folder already exists (and we aren't forcing a new run)
+    if (!forceNew) {
+      const check = await window.ipcRenderer.checkExtractionExists(outputDir);
+      if (check.exists && check.hasFrames) {
+        setExistingFramesCount(check.count || 0);
+        setShowExtractionDialog(true);
+        return;
+      }
+    }
 
     setIsProcessing(true);
     setFrames([]);
+    setShowExtractionDialog(false);
 
     try {
       const outputDir = filePath + '_extracted';
@@ -238,6 +251,43 @@ function App() {
     } catch (error) {
       console.error(error);
       alert('Extraction failed: ' + error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  /**
+   * Use existing frames from the folder
+   */
+  const handleUseExistingFrames = async () => {
+    if (!filePath) return;
+    const outputDir = filePath + '_extracted';
+    setIsProcessing(true);
+    setShowExtractionDialog(false);
+
+    try {
+      const result = await window.ipcRenderer.listFrames(outputDir);
+      if (result.success) {
+        // Mock some frame data based on paths
+        const loadedFrames: FrameData[] = result.frames.map((p: string, i: number) => ({
+          path: p,
+          type: 'keyframe', // Assume keyframe for simplicity
+          frame: i + 1,
+          time: undefined
+        }));
+        setFrames(loadedFrames);
+
+        // Also try to load existing timeline
+        const timelineResult = await window.ipcRenderer.loadStoryTimeline(outputDir);
+        if (timelineResult.success && timelineResult.timeline) {
+          setStoryTimeline(timelineResult.timeline);
+          console.log("Restored timeline from disk:", timelineResult.timeline.length, "scenes");
+        }
+      } else {
+        alert("Failed to load frames: " + result.error);
+      }
+    } catch (error) {
+      console.error(error);
     } finally {
       setIsProcessing(false);
     }
@@ -317,145 +367,10 @@ function App() {
   /**
    * Analyze only selected frames
    */
-  const handleAnalyzeSelected = async () => {
-    const indices = Array.from(selectedIndices).sort((a, b) => a - b);
-    await analyzeFrames(indices);
-  };
+  // --------------------------------------------------------------------------
+  // Story Analysis
+  // --------------------------------------------------------------------------
 
-  /**
-   * Analyze all frames
-   */
-  const handleAnalyzeAll = async () => {
-    const allIndices = frames.map((_, i) => i);
-    await analyzeFrames(allIndices);
-  };
-
-  /**
-   * Handle comparing two selected frames
-   */
-  const handleCompareSelected = async () => {
-    if (selectedIndices.size !== 2) return;
-
-    // Get selected frames and sort by index (time)
-    const selectedFrames = Array.from(selectedIndices)
-      .sort((a, b) => a - b)
-      .map(index => frames[index]);
-
-    const [frame1, frame2] = selectedFrames;
-
-    try {
-      setIsDescribing(true);
-
-      const result = await window.ipcRenderer.compareFrames(frame1.path, frame2.path);
-
-      if (result.success && result.comparison) {
-        setComparisonResult({
-          frame1: frame1.path,
-          frame2: frame2.path,
-          result: result.comparison
-        });
-      } else {
-        alert(`Comparison failed: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Comparison error:', error);
-      alert('Comparison failed due to an error');
-    } finally {
-      setIsDescribing(false);
-    }
-  };
-
-  /**
-   * Export comparison result
-   */
-  const handleExportComparison = async () => {
-    if (!comparisonResult || !filePath) return;
-
-    const data = {
-      source_video: filePath,
-      exported_at: new Date().toISOString(),
-      start_frame: comparisonResult.frame1,
-      end_frame: comparisonResult.frame2,
-      analysis: comparisonResult.result
-    };
-
-    const outputDir = filePath + '_extracted';
-
-    try {
-      setIsExportingComparison(true);
-      const result = await window.ipcRenderer.exportComparisonJson(outputDir, data);
-
-      if (result.success) {
-        alert(`Comparison exported to:\n${result.path}`);
-      } else {
-        alert(`Export failed: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('Export failed');
-    } finally {
-      setIsExportingComparison(false);
-    }
-  };
-
-  /**
-   * Sequential Analysis (Analyze Flow) of ALL extracted frames
-   */
-  const handleAnalyzeFlow = async () => {
-    if (frames.length < 2 || !filePath) return;
-
-    setIsAnalyzingFlow(true);
-    setFlowProgress({ current: 0, total: frames.length - 1 });
-    setFlowResults(null);
-
-    try {
-      const imagePaths = frames.map(f => f.path);
-      const result = await window.ipcRenderer.compareSequential(imagePaths);
-
-      if (result.success && result.results) {
-        setFlowResults(result.results);
-      } else {
-        alert('Sequential analysis failed: ' + (result.error || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error('Flow analysis error:', error);
-      alert('An error occurred during flow analysis');
-    } finally {
-      setIsAnalyzingFlow(false);
-      setFlowProgress(undefined);
-    }
-  };
-
-  /**
-   * Export the sequential flow report
-   */
-  const handleExportFlowReport = async () => {
-    if (!flowResults || !filePath) return;
-
-    const data = {
-      source_video: filePath,
-      exported_at: new Date().toISOString(),
-      total_frames: frames.length,
-      sequential_comparisons: flowResults
-    };
-
-    const outputDir = filePath + '_extracted';
-
-    try {
-      const result = await window.ipcRenderer.exportFlowReport(outputDir, data);
-      if (result.success) {
-        alert(`Flow report exported to:\n${result.path}`);
-      } else {
-        alert('Export failed: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('Export failed');
-    }
-  };
-
-  const [storyTimeline, setStoryTimeline] = useState<SceneAnalysis[]>([]);
-  const [cachedAnalysis, setCachedAnalysis] = useState<SceneAnalysis | null>(null);
 
   // --------------------------------------------------------------------------
   // Storyboard Logic
@@ -471,8 +386,40 @@ function App() {
 
     if (selectedPaths.length < 2) return;
 
+    // Check if we have a valid cache for these EXACT frames
+    const isCacheValid = cachedAnalysis &&
+      cachedAnalysis.frames &&
+      JSON.stringify(cachedAnalysis.frames) === JSON.stringify(selectedPaths);
+
+    if (isCacheValid) {
+      console.log("Using cached story analysis");
+      // Keep cachedAnalysis as is
+    } else {
+      console.log("New selection, clearing cache");
+      setCachedAnalysis(null);
+    }
+
     setStoryboardFrames(selectedPaths);
     setStoryboardOpen(true);
+  };
+
+  /**
+   * Cache the analysis when it completes
+   */
+  const handleAnalysisComplete = (analysis: SceneAnalysis) => {
+    setCachedAnalysis(analysis);
+
+    // Auto-sync with timeline if this scene already exists there
+    setStoryTimeline(prev => {
+      const index = prev.findIndex(s => s.scene_id === analysis.scene_id);
+      if (index !== -1) {
+        const newTimeline = [...prev];
+        newTimeline[index] = analysis;
+        console.log("Auto-synced scene in timeline:", analysis.scene_id);
+        return newTimeline;
+      }
+      return prev;
+    });
   };
 
   /**
@@ -521,61 +468,14 @@ function App() {
 
   const handleViewTimelineScene = (scene: SceneAnalysis) => {
     // Re-hydrate the storyboard view with stored data
-    // We need to set frames and open the view, but also Pre-Load the analysis
     if (scene.frames) {
       setStoryboardFrames(scene.frames);
-      // TODO: Ideally we pass the PRE-EXISTING analysis to the view so it doesn't re-run
-      // For now, let's just create a state for "cachedAnalysis" in App and pass it down
-      // Or we can modify StoryboardView to accept an `initialAnalysis` prop
+      setCachedAnalysis(scene); // This ensures the view loads the existing analysis
       setStoryboardOpen(true);
     }
   };
 
 
-  /**
-   * Export analyzed frames data to JSON file
-   */
-  const handleExportJson = async () => {
-    if (!filePath) return;
-
-    // Build export data from analyzed frames
-    const exportData = {
-      source_video: filePath,
-      exported_at: new Date().toISOString(),
-      total_frames: frames.length,
-      analyzed_frames: frames.filter(f => f.isAnalyzed).length,
-      frames: frames
-        .filter(f => f.isAnalyzed)
-        .map(f => ({
-          path: f.path,
-          type: f.type,
-          time: f.time,
-          description: f.description,
-          objects: f.objects,
-          tags: f.tags,
-          scene_type: f.scene_type,
-          visual_elements: f.visual_elements
-        })),
-      // Include the story timeline in the main export
-      story_timeline: storyTimeline
-    };
-
-    // Export to the same folder as extracted frames
-    const outputDir = filePath + '_extracted';
-
-    try {
-      const result = await window.ipcRenderer.exportAnalysisJson(outputDir, exportData);
-
-      if (result.success) {
-        alert(`Analysis exported to:\n${result.path}`);
-      } else {
-        alert(`Export failed: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('Export failed: ' + (error instanceof Error ? error.message : error));
-    }
-  };
 
   // ============================================================================
   // Helper: Format duration
@@ -592,38 +492,15 @@ function App() {
   // ============================================================================
 
   return (
-    <div
-      className="app-container"
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#1e1e1e',
-        color: '#eee',
-        paddingBottom: '35px' // Space for status bar
-      }}
-    >
+    <div className="app-container">
       {/* Application Header */}
-      <header style={{
-        padding: '10px 20px',
-        backgroundColor: '#252526',
-        borderBottom: '1px solid #000',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ margin: 0, fontSize: '1.1rem' }}>Video to Prompts</h1>
+      <header className="app-header">
+        <div className="header-content">
+          <h1 className="header-title">Video to Prompts</h1>
           {filePath && (
             <button
               onClick={() => { setFilePath(null); setVideoInfo(null); setFrames([]); }}
-              style={{
-                padding: '4px 10px',
-                fontSize: '0.8rem',
-                backgroundColor: 'transparent',
-                border: '1px solid #666',
-                borderRadius: '4px',
-                color: '#aaa',
-                cursor: 'pointer'
-              }}
+              className="btn-change-video"
             >
               Change Video
             </button>
@@ -633,45 +510,27 @@ function App() {
 
       {/* Main Content */}
       {/* Status Bar */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '8px 16px',
-        backgroundColor: '#1e1e1e',
-        borderBottom: '1px solid #333',
-        fontSize: '0.85rem'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          <span style={{ color: '#aaa' }}>
-            Engine: <span style={{ color: aiStatusMessage.includes('Connected') ? '#4caf50' : '#f44336' }}>{aiStatusMessage}</span>
+      <div className="status-bar-secondary">
+        <div className="status-bar-info">
+          <span className={`engine-status ${aiStatusMessage.includes('Connected') ? 'connected' : 'disconnected'}`}>
+            Engine: {aiStatusMessage}
           </span>
           {analysisProgress && (
-            <span style={{ color: '#007AFF' }}>
+            <span className="analysis-status">
               Analyzing: {analysisProgress.current} / {analysisProgress.total}
-            </span>
-          )}
-          {flowProgress && (
-            <span style={{ color: '#6f42c1' }}>
-              Flow: {flowProgress.current} / {flowProgress.total}
             </span>
           )}
         </div>
         {filePath && (
-          <div style={{ color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '400px' }}>
+          <div className="file-path-display">
             {filePath}
           </div>
         )}
       </div>
+
       {!filePath ? (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: 'calc(100vh - 50px)',
-          padding: '20px'
-        }}>
-          <div style={{ width: '400px' }}>
+        <div className="empty-state-container">
+          <div className="empty-state-inner">
             <FilePicker onFileSelected={handleFileSelect} />
           </div>
         </div>
@@ -679,25 +538,14 @@ function App() {
         <>
           {/* Video Info Bar */}
           {videoInfo && (
-            <div style={{
-              padding: '10px 20px',
-              backgroundColor: '#2a2a2a',
-              borderBottom: '1px solid #333',
-              display: 'flex',
-              gap: '20px',
-              flexWrap: 'wrap',
-              fontSize: '0.85rem'
-            }}>
+            <div className="video-info-bar">
               <span><strong>Duration:</strong> {formatDuration(videoInfo.duration)}</span>
               <span><strong>FPS:</strong> {videoInfo.fps}</span>
               <span><strong>Resolution:</strong> {videoInfo.width}×{videoInfo.height}</span>
               <span><strong>Codec:</strong> {videoInfo.codec}</span>
               <span><strong>Bitrate:</strong> {videoInfo.bitrate} kb/s</span>
               <span><strong>Total Frames:</strong> {videoInfo.totalFrames}</span>
-              <span style={{
-                color: aiStatusMessage.includes('Connected') ? '#4CAF50' : '#FF5252',
-                fontWeight: 'bold'
-              }}>
+              <span className={`ai-status-indicator ${aiStatusMessage.includes('Connected') ? 'connected' : 'error'}`}>
                 {aiStatusMessage}
               </span>
             </div>
@@ -726,8 +574,6 @@ function App() {
             isProcessing={isProcessing}
             selectedModel="LM Studio (Local API)"
             onModelChange={handleModelChange}
-            onAnalyzeFlow={handleAnalyzeFlow}
-            isAnalyzingFlow={isAnalyzingFlow}
             framesCount={frames.length}
           />
 
@@ -736,24 +582,11 @@ function App() {
             frames={frames}
             selectedIndices={selectedIndices}
             onSelectionChange={setSelectedIndices}
-            onAnalyzeSelected={handleAnalyzeSelected}
-            onAnalyzeAll={handleAnalyzeAll}
-            onExportJson={handleExportJson}
-            onCompareSelected={handleCompareSelected}
+            onAnalyzeStory={handleAnalyzeStory}
             isDescribing={isDescribing}
             analysisProgress={analysisProgress}
             hasAnalyzedFrames={frames.some(f => f.isAnalyzed)}
-            onAnalyzeStory={handleAnalyzeStory}
           />
-
-          {/* Sequential Flow Report */}
-          {flowResults && (
-            <FlowReport
-              results={flowResults}
-              onClose={() => setFlowResults(null)}
-              onExport={handleExportFlowReport}
-            />
-          )}
 
           {/* Storyboard View */}
           <StoryboardView
@@ -763,39 +596,14 @@ function App() {
             onSaveToTimeline={handleSaveToTimeline}
             onExport={handleExportScene}
             initialAnalysis={cachedAnalysis}
+            onAnalysisComplete={handleAnalysisComplete}
           />
-
-          {/* Comparison Modal */}
-          {comparisonResult && comparisonResult.frame1 && comparisonResult.frame2 && (
-            <ComparisonView
-              frame1Path={comparisonResult.frame1}
-              frame2Path={comparisonResult.frame2}
-              comparisonResult={comparisonResult.result}
-              onClose={() => setComparisonResult(null)}
-              onExport={handleExportComparison}
-              isExporting={isExportingComparison}
-            />
-          )}
         </>
       )}
 
       {/* Status Bar */}
-      <footer style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        width: '100%',
-        backgroundColor: '#007AFF', // Blue accent
-        color: 'white',
-        fontSize: '0.8rem',
-        padding: '5px 20px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        zIndex: 1000,
-        boxShadow: '0 -2px 5px rgba(0,0,0,0.2)'
-      }}>
-        <div style={{ display: 'flex', gap: '20px' }}>
+      <footer className="app-footer">
+        <div className="footer-info">
           <span><strong>AI Engine:</strong> LM Studio</span>
           {isDescribing ? (
             <span><strong>Status:</strong> Analyzing Frames...</span>
@@ -805,10 +613,43 @@ function App() {
             <span><strong>Status:</strong> {aiStatusMessage}</span>
           )}
         </div>
-        <div>
+        <div className="footer-version">
           v1.0.0
         </div>
       </footer>
+
+      {/* Extraction Choice Dialog */}
+      {showExtractionDialog && (
+        <div className="modal-overlay">
+          <div className="dialog-container">
+            <h2 className="dialog-title">Existing Frames Found</h2>
+            <p className="dialog-text">
+              We found <strong>{existingFramesCount}</strong> previously extracted images for this video.
+              Would you like to reuse them or clear the folder and start over?
+            </p>
+            <div className="dialog-actions">
+              <button
+                onClick={handleUseExistingFrames}
+                className="btn-dialog-primary"
+              >
+                🚀 Reuse Existing Frames
+              </button>
+              <button
+                onClick={() => handleRunExtraction(true)}
+                className="btn-dialog-secondary"
+              >
+                🧹 Delete & Re-run Extraction
+              </button>
+              <button
+                onClick={() => setShowExtractionDialog(false)}
+                className="btn-dialog-cancel"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

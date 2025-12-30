@@ -1,7 +1,5 @@
 /**
  * App.css - Application-specific styles
- * 
- * Overrides for full-width layout in Electron app.
  */
 
 #root {
@@ -10,4 +8,250 @@
   margin: 0;
   padding: 0;
   text-align: left;
+}
+
+.app-container {
+  min-height: 100vh;
+  background-color: #1e1e1e;
+  color: #eee;
+  padding-bottom: 35px;
+  /* Space for fixed status bar */
+}
+
+/* --- Header --- */
+.app-header {
+  padding: 10px 20px;
+  background-color: #252526;
+  border-bottom: 1px solid #000;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.btn-change-video {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  background-color: transparent;
+  border: 1px solid #666;
+  border-radius: 4px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-change-video:hover {
+  border-color: #888;
+  color: #ccc;
+}
+
+/* --- Status Bar (Secondary) --- */
+.status-bar-secondary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #333;
+  font-size: 0.85rem;
+}
+
+.status-bar-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.engine-status {
+  color: #aaa;
+}
+
+.engine-status.connected {
+  color: #4caf50;
+}
+
+.engine-status.disconnected {
+  color: #f44336;
+}
+
+.analysis-status {
+  color: #007AFF;
+}
+
+.file-path-display {
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 400px;
+}
+
+/* --- Empty State --- */
+.empty-state-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 50px);
+  padding: 20px;
+}
+
+.empty-state-inner {
+  width: 400px;
+}
+
+/* --- Video Info Bar --- */
+.video-info-bar {
+  padding: 10px 20px;
+  background-color: #2a2a2a;
+  border-bottom: 1px solid #333;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.ai-status-indicator {
+  font-weight: bold;
+}
+
+.ai-status-indicator.connected {
+  color: #4CAF50;
+}
+
+.ai-status-indicator.error {
+  color: #FF5252;
+}
+
+/* --- Fixed Footer --- */
+.app-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background-color: #007AFF;
+  color: white;
+  font-size: 0.8rem;
+  padding: 5px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 1000;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.footer-info {
+  display: flex;
+  gap: 20px;
+}
+
+.footer-version {
+  opacity: 0.8;
+}
+
+/* --- Modal Overlays & Dialogs --- */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(10px);
+}
+
+.dialog-container {
+  background-color: #1a1a1a;
+  padding: 40px;
+  border-radius: 20px;
+  max-width: 520px;
+  width: 90%;
+  border: 1px solid #333;
+  text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.dialog-title {
+  margin: 0;
+  color: #fff;
+  font-size: 1.8rem;
+  font-weight: 800;
+}
+
+.dialog-text {
+  color: #aaa;
+  line-height: 1.6;
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.btn-dialog-primary {
+  padding: 16px 24px;
+  background: #6f42c1;
+  border: none;
+  color: white;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1.1rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+}
+
+.btn-dialog-primary:hover {
+  background: #5a32a3;
+  transform: translateY(-1px);
+}
+
+.btn-dialog-secondary {
+  padding: 14px 24px;
+  background: transparent;
+  border: 1px solid #444;
+  color: white;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-dialog-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-dialog-cancel {
+  padding: 10px 24px;
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 5px;
+  transition: color 0.2s;
+}
+
+.btn-dialog-cancel:hover {
+  color: #888;
 }

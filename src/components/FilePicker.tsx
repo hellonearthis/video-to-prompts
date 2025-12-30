@@ -15,6 +15,7 @@
  */
 
 import React, { useState } from 'react';
+import './FilePicker.css';
 
 // ============================================================================
 // Type Definitions
@@ -58,9 +59,6 @@ export const FilePicker: React.FC<FilePickerProps> = ({ onFileSelected }) => {
     /**
      * Handles the drop event when a file is released over the drop zone.
      * Extracts the file path and notifies the parent component.
-     * 
-     * Note: Electron's File object includes a 'path' property that contains
-     * the absolute file system path, which is not available in standard browsers.
      */
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
@@ -103,25 +101,14 @@ export const FilePicker: React.FC<FilePickerProps> = ({ onFileSelected }) => {
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={handleClick}
-            style={{
-                // Dashed border indicates drop zone
-                border: '2px dashed #666',
-                borderRadius: '8px',
-                padding: '40px',
-                textAlign: 'center',
-                cursor: 'pointer',
-                // Visual feedback: darker background when dragging
-                backgroundColor: dragActive ? '#333' : 'transparent',
-                transition: 'background-color 0.2s'
-            }}
         >
             {/* Primary instruction text */}
-            <p style={{ fontSize: '1.2rem', marginBottom: '10px' }}>
+            <p className="file-picker-title">
                 Drag & Drop a video file here
             </p>
 
             {/* Secondary instruction */}
-            <p style={{ fontSize: '0.9rem', color: '#888' }}>
+            <p className="file-picker-subtitle">
                 or click to browse
             </p>
         </div>

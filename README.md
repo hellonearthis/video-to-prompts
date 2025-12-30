@@ -7,6 +7,7 @@ A desktop application that breaks down video clips into important visual compone
 ### Frame Extraction
 - **Video Import**: Drag-and-drop or file picker for video files (MP4, MOV, AVI, MKV)
 - **Video Metadata**: Display duration, FPS, resolution, codec, and bitrate
+- **Smart Extraction**: Automatically detects existing extraction folders and offers to reuse frames or clear and re-run.
 - **Three Extraction Modes**:
   - **Time Frames**: Extract frames at regular time intervals (configurable FPS)
   - **Keyframes**: Extract actual video keyframes (I-frames from video encoding)
@@ -18,6 +19,7 @@ A desktop application that breaks down video clips into important visual compone
 - **Frame Comparison**: Select 2 frames to analyze the *action* and *object flow* between them
 - **Sequential Flow Analysis**: Select multiple frames (3+) to analyze the continuous flow of action and changes across the sequence
 - **Story Director's Cut**: Select multiple frames to generate a narrative storyboard, with AI-suggested panel layouts and narrative arc analysis
+- **Story Timeline Persistence**: Scenes added to the timeline are automatically saved to `story_timeline.json` and restored when reusing a project.
 - **Export to JSON**: Save all analysis data, comparison results, or full story timelines
 
 ### AI Analysis Output
@@ -37,6 +39,11 @@ Story Analysis includes:
 - **Narrative Arc**: "What happened", "The Change", and "Implied Subtext"
 - **Key Entities**: Main characters and their roles (Protagonist/Antagonist)
 - **Story Signals**: Importance score, agency, and emotional shifts
+- **Visual Narrative Grammar**: Color-coded sections for intuitive reading:
+    - 🔵 **Setup / Atmosphere**: Context and environment
+    - 🟢 **Action**: Major events and turning points
+    - 🟠 **Reaction**: Emotional beats and subtext
+    - 🟣 **Reveal**: Narrative climax and significant shifts
 - **Panel Guidance**: AI-suggested comic panel layout, selecting the *best* frames for specific beats
 
 ## Requirements
@@ -82,23 +89,24 @@ npm run build
 1. **Load a video** via drag-and-drop or file picker
 2. **Configure extraction settings** (FPS, scene threshold, extraction modes)
 3. **Click "Run Extraction"** to extract frames
-4. **Select frames** for analysis:
+4. **Smart Reuse**: If frames already exist, choose **"Reuse"** to skip extraction and restore your **Story Timeline**.
+5. **Select frames** for analysis:
    - Click a frame to select it
    - Ctrl/Cmd+Click to add/remove from selection
    - Shift+Click to select a range
-5. **Analyze frames**:
+6. **Analyze frames**:
    - Click **"Analyze Selected"** to analyze only selected frames
    - Click **"Analyze All"** to analyze every frame
-6. **Compare two frames (Action Analysis)**:
+7. **Compare two frames (Action Analysis)**:
    - Select exactly 2 frames
    - Click **"Compare Action"** (purple button)
    - View the side-by-side comparison with AI analysis
-7. **Analyze Story (Director's Cut)**:
+8. **Analyze Story (Director's Cut)**:
    - Select multiple frames (2+) that form a scene
    - Click **"Analyze Story"** (in the action bar)
    - View the narrative breakdown and AI-suggested panel layout
    - **Add to Timeline**: Save the scene to your session timeline
-8. **Export results**:
+9. **Export results**:
    - **"Export JSON"**: Saves all analyzed frame data
    - **"Export to JSON"** (in comparison/story view): Saves specific analysis results
 
@@ -113,21 +121,35 @@ Video to Prompts/
 │   └── lmstudio.ts             # LM Studio AI integration
 ├── src/                         # React Frontend (Renderer Process)
 │   ├── App.tsx                 # Main application component
-│   ├── App.css                 # Application styles
+│   ├── App.css                 # Application layout styles
 │   ├── main.tsx                # React entry point
 │   ├── vite-env.d.ts           # TypeScript type definitions
 │   └── components/
-│       ├── FilePicker.tsx      # Video file selection component
-│       ├── ControlPanel.tsx    # Extraction settings controls
-│       ├── ThumbnailGrid.tsx   # Frame display grid with selection
+│       ├── FilePicker.tsx      # Video selection component
+│       ├── FilePicker.css      # Component styles
+│       ├── ControlPanel.tsx    # Extraction settings
+│       ├── ControlPanel.css    # Component styles
+│       ├── ThumbnailGrid.tsx   # Frame display grid
+│       ├── ThumbnailGrid.css   # Component styles
 │       ├── ComparisonView.tsx  # Frame comparison modal
-│       ├── StoryboardView.tsx  # Narrative analysis & panel layout view
-│       ├── TimelineStrip.tsx   # Visual timeline of saved scenes
-│       └── FlowReport.tsx      # Sequential action flow report
+│       ├── ComparisonView.css  # Component styles
+│       ├── StoryboardView.tsx  # Narrative analysis view
+│       ├── StoryboardView.css  # Component styles
+│       ├── TimelineStrip.tsx   # Saved scenes timeline
+│       ├── TimelineStrip.css   # Component styles
+│       ├── FlowReport.tsx      # Action flow report
+│       └── FlowReport.css      # Component styles
 ├── package.json                 # Dependencies and scripts
 ├── vite.config.ts              # Vite bundler configuration
 └── tsconfig.json               # TypeScript configuration
 ```
+
+## Architecture: Clean CSS System
+
+The application has been refactored to use a **100% Class-Based CSS architecture**. 
+- **Zero Inline Styles**: All component styling is managed via external `.css` files.
+- **Consistent Theming**: Uses CSS variables for color coordination and visual narrative grammar.
+- **Maintainability**: Clear separation of concerns between structure (TSX) and presentation (CSS).
 
 ## Technology Stack
 

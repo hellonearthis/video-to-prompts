@@ -1,0 +1,199 @@
+.comparison-view-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.comparison-view-modal {
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 1000px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 1px solid #333;
+}
+
+.comparison-view-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #252526;
+}
+
+.comparison-view-title {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.btn-close-comparison {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.btn-close-comparison:hover {
+    color: #fff;
+}
+
+.comparison-view-scroll-content {
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.comparison-images-grid {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.frame-comparison-container {
+    flex: 1;
+    min-width: 300px;
+}
+
+.frame-comparison-label {
+    margin-bottom: 8px;
+    color: #aaa;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.frame-comparison-img-box {
+    aspect-ratio: 16 / 9;
+    background-color: #000;
+    border-radius: 4px;
+    overflow: hidden;
+    border: 2px solid #333;
+}
+
+.frame-comparison-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.comparison-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    font-size: 2rem;
+}
+
+.comparison-analysis-card {
+    background-color: #2a2a2a;
+    padding: 20px;
+    border-radius: 6px;
+    margin-top: 10px;
+}
+
+.analysis-section {
+    margin-bottom: 20px;
+}
+
+.analysis-section:last-child {
+    margin-bottom: 0;
+}
+
+.analysis-section-title {
+    margin: 0 0 10px 0;
+    font-size: 1rem;
+    border-bottom: 1px solid #444;
+    padding-bottom: 5px;
+}
+
+.analysis-section-title.action {
+    color: #4CAF50;
+}
+
+.analysis-section-title.flow {
+    color: #2196F3;
+}
+
+.analysis-section-title.differences {
+    color: #FF9800;
+}
+
+.analysis-text {
+    line-height: 1.5;
+    color: #eee;
+    margin: 0;
+}
+
+.analysis-list {
+    margin: 0;
+    padding-left: 20px;
+    color: #eee;
+}
+
+.analysis-list-item {
+    margin-bottom: 5px;
+}
+
+.comparison-view-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #333;
+    background-color: #252526;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.btn-secondary {
+    padding: 8px 16px;
+    background-color: transparent;
+    border: 1px solid #555;
+    color: #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+    background-color: #333;
+}
+
+.btn-primary-export {
+    padding: 8px 16px;
+    background-color: #2196F3;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s;
+}
+
+.btn-primary-export:hover:not(:disabled) {
+    background-color: #1976D2;
+}
+
+.btn-primary-export:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.btn-icon {
+    font-style: normal;
+}

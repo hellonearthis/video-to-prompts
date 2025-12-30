@@ -97,6 +97,10 @@ interface Window {
         extractKeyframes: (filePath: string, outputDir: string) => Promise<string[]>;
         extractSceneChanges: (filePath: string, outputDir: string, threshold: number) => Promise<{ path: string; time: number; pts: number; frame: number }[]>;
         getVideoInfo: (filePath: string) => Promise<VideoInfo>;
+        checkExtractionExists: (outputDir: string) => Promise<{ exists: boolean; hasFrames?: boolean; count?: number; error?: string }>;
+        listFrames: (outputDir: string) => Promise<{ success: boolean; frames: string[]; error?: string }>;
+        saveStoryTimeline: (outputDir: string, timelineData: any) => Promise<{ success: boolean; path?: string; error?: string }>;
+        loadStoryTimeline: (outputDir: string) => Promise<{ success: boolean; timeline?: any; error?: string }>;
         checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
         initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;
         analyzeFrame: (imagePath: string) => Promise<AnalysisResult>;

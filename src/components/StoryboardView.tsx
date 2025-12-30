@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import './StoryboardView.css';
 
 interface StoryboardViewProps {
     isOpen: boolean;
@@ -7,6 +8,7 @@ interface StoryboardViewProps {
     onSaveToTimeline: (analysis: SceneAnalysis) => void;
     onExport: (analysis: SceneAnalysis) => void;
     initialAnalysis?: SceneAnalysis | null;
+    onAnalysisComplete?: (analysis: SceneAnalysis) => void;
 }
 
 export interface SceneAnalysis {
@@ -33,29 +35,33 @@ export interface SceneAnalysis {
         panel_count: number;
         panel_roles: string[];
         omit_literal_action: boolean;
+        panels: Array<{
+            panel_index: number;
+            role: string;
+            description: string;
+            best_frame_index: number;
+        }>;
     };
     confidence: number;
-    // Client-side metadata (added during analysis)
     frames?: string[];
     timestamp?: string;
 }
 
 export const StoryboardView: React.FC<StoryboardViewProps> = ({
-    isOpen, onClose, framePaths, onSaveToTimeline, onExport, initialAnalysis
+    isOpen, onClose, framePaths, onSaveToTimeline, onExport, initialAnalysis, onAnalysisComplete
 }) => {
     const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [editingPanelIndex, setEditingPanelIndex] = useState<number | null>(null);
 
     useEffect(() => {
         if (isOpen) {
             if (initialAnalysis) {
                 setAnalysis(initialAnalysis);
-                // Ensure no error/loading state lingers
                 setLoading(false);
                 setError(null);
             } else if (framePaths.length > 0) {
-                // Only analyze if no initial analysis provided
                 analyzeStory();
             }
         }
@@ -69,13 +75,13 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
             console.log("Starting analysis for frames:", framePaths);
             const result = await window.ipcRenderer.analyzeStorySequence(framePaths);
             if (result.success && result.analysis) {
-                // Enrich analysis with local metadata
                 const enrichedAnalysis: SceneAnalysis = {
                     ...result.analysis,
                     frames: framePaths,
                     timestamp: new Date().toISOString()
                 };
                 setAnalysis(enrichedAnalysis);
+                onAnalysisComplete?.(enrichedAnalysis);
             } else {
                 setError(result.error || "Failed to analyze story");
             }
@@ -86,46 +92,51 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
         }
     };
 
+    const handleFrameSelect = (frameIdx: number) => {
+        if (editingPanelIndex === null || !analysis) return;
+
+        const newAnalysis = { ...analysis };
+        newAnalysis.panel_guidance = { ...newAnalysis.panel_guidance };
+        newAnalysis.panel_guidance.panels = [...newAnalysis.panel_guidance.panels];
+        newAnalysis.panel_guidance.panels[editingPanelIndex] = {
+            ...newAnalysis.panel_guidance.panels[editingPanelIndex],
+            best_frame_index: frameIdx
+        };
+
+        setAnalysis(newAnalysis);
+        onAnalysisComplete?.(newAnalysis);
+        setEditingPanelIndex(null);
+    };
+
+    const getRoleClass = (role: string) => {
+        const r = role.toLowerCase();
+        if (r.includes('reveal')) return 'role-reveal';
+        if (r.includes('reaction')) return 'role-reaction';
+        if (r.includes('action')) return 'role-action';
+        if (r.includes('setup') || r.includes('atmosphere') || r.includes('context')) return 'role-setup';
+        return '';
+    };
+
     if (!isOpen) return null;
 
     return (
-        <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 3000,
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
-            backdropFilter: 'blur(5px)'
-        }}>
-            <div style={{
-                width: '90%', maxWidth: '1400px', height: '90vh',
-                backgroundColor: '#1a1a1a', borderRadius: '16px',
-                border: '1px solid #333', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
-                overflow: 'hidden', display: 'flex', flexDirection: 'column'
-            }}>
-                {/* Header */}
-                <div style={{
-                    padding: '20px 30px', borderBottom: '1px solid #333',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: 'linear-gradient(to right, #1a1a1a, #252525)'
-                }}>
-                    <div>
-                        <h2 style={{ margin: 0, color: '#fff', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '1.2em' }}>🎬</span> Narrative Storyboard
-                        </h2>
-                        <span style={{ color: '#888', fontSize: '0.9rem' }}>
-                            Analyzing {framePaths.length} frames as a coherent scene
-                        </span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="storyboard-overlay">
+            <div className="storyboard-container">
+                <div className="storyboard-header">
+                    <h2>Narrative Storyboard</h2>
+                    <div className="header-actions">
+                        <button
+                            onClick={analyzeStory}
+                            disabled={loading}
+                            className="btn-secondary"
+                        >
+                            {loading ? 'Analyzing...' : '🔄 Re-analyze'}
+                        </button>
                         {analysis && (
                             <>
                                 <button
                                     onClick={() => onExport(analysis)}
-                                    style={{
-                                        background: '#28a745', border: 'none', color: '#fff',
-                                        padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
-                                        fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px'
-                                    }}
+                                    className="btn-primary btn-green"
                                 >
                                     📥 Export JSON
                                 </button>
@@ -134,157 +145,120 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                         onSaveToTimeline(analysis);
                                         onClose();
                                     }}
-                                    style={{
-                                        background: '#6f42c1', border: 'none', color: '#fff',
-                                        padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
-                                        fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px'
-                                    }}
+                                    className="btn-primary btn-purple"
                                 >
                                     💾 Add to Timeline
                                 </button>
                             </>
                         )}
-                        <div style={{ width: '1px', backgroundColor: '#444', margin: '0 10px' }}></div>
-                        <button onClick={onClose} style={{
-                            background: 'none', border: '1px solid #444', color: '#fff',
-                            padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
-                            transition: 'all 0.2s'
-                        }}>
+                        <div className="header-divider" />
+                        <button onClick={onClose} className="btn-secondary">
                             Close
                         </button>
                     </div>
                 </div>
 
-                {/* Content */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: '30px', display: 'flex', gap: '30px' }}>
-
+                <div className="storyboard-content">
                     {loading && (
-                        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: '20px' }}>
-                            <div className="spinner" style={{
-                                width: '50px', height: '50px', border: '3px solid #333',
-                                borderTop: '3px solid #6f42c1', borderRadius: '50%', animation: 'spin 1s linear infinite'
-                            }} />
-                            <p style={{ color: '#888' }}>analyzing narrative beats...</p>
-                            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                        <div className="loading-overlay">
+                            <div className="spinner" />
+                            <p>analyzing narrative beats...</p>
                         </div>
                     )}
 
                     {error && (
-                        <div style={{ color: '#ff4444', padding: '20px', border: '1px solid #ff4444', borderRadius: '8px' }}>
+                        <div className="error-box">
                             <h3>Analysis Failed</h3>
                             <p>{error}</p>
-                            <button onClick={analyzeStory} style={{ marginTop: '10px', padding: '8px 16px', backgroundColor: '#333', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>Retry</button>
+                            <button onClick={analyzeStory} className="btn-secondary">Retry</button>
                         </div>
                     )}
 
                     {analysis && (
                         <>
-                            {/* Left Column: Narrative Summary */}
-                            <div style={{ flex: '0 0 350px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <Section title="What Happened" color="#6f42c1">
-                                    <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.summary.what_happened}</p>
+                            <div className="narrative-col">
+                                <Section title="What Happened" className="role-setup">
+                                    <p>{analysis.summary.what_happened}</p>
                                 </Section>
 
-                                <Section title="The Change" color="#2196f3">
-                                    <p style={{ margin: 0, lineHeight: 1.6 }}>{analysis.summary.change}</p>
+                                <Section title="The Change" className="role-action">
+                                    <p>{analysis.summary.change}</p>
                                     {analysis.story_signals.irreversible && (
-                                        <Badge color="#ff4444">Irreversible Change</Badge>
+                                        <Badge variant="irreversible">Irreversible Change</Badge>
                                     )}
                                 </Section>
 
-                                <Section title="Subtext & Implied" color="#00bcd4">
-                                    <p style={{ margin: 0, fontStyle: 'italic', color: '#aaa' }}>"{analysis.summary.implied}"</p>
+                                <Section title="Subtext & Implied" className="role-reaction">
+                                    <p className="implied-text">"{analysis.summary.implied}"</p>
                                 </Section>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                <div className="metric-grid">
                                     <MetricBox label="Importance" value={analysis.story_signals.importance} max={10} />
                                     <MetricBox label="Confidence" value={Math.round(analysis.confidence * 100)} unit="%" />
                                 </div>
 
-                                <Section title="Emotional Shift" color="#e91e63">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.1rem' }}>
-                                        <span style={{ color: '#aaa' }}>{analysis.story_signals.emotional_shift.from}</span>
-                                        <span>➜</span>
-                                        <span style={{ color: '#fff', fontWeight: 'bold' }}>{analysis.story_signals.emotional_shift.to}</span>
+                                <Section title="Emotional Shift" className="role-reveal">
+                                    <div className="emotional-shift-container">
+                                        <span className="shift-from">{analysis.story_signals.emotional_shift.from}</span>
+                                        <span className="shift-arrow">➜</span>
+                                        <span className="shift-to">{analysis.story_signals.emotional_shift.to}</span>
                                     </div>
                                 </Section>
 
-                                <Section title="Key Entities" color="#ff9800">
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                <Section title="Key Entities" className="role-setup">
+                                    <div className="entity-list">
                                         {analysis.key_entities.map((entity, i) => (
-                                            <div key={i} style={{
-                                                backgroundColor: '#2a2a2a', padding: '10px', borderRadius: '6px',
-                                                borderLeft: `3px solid ${entity.role === 'protagonist' ? '#4caf50' : entity.role === 'antagonist' ? '#f44336' : '#9e9e9e'}`
-                                            }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                    <span style={{ fontWeight: '600' }}>{entity.name}</span>
-                                                    <span style={{ fontSize: '0.8rem', opacity: 0.7, textTransform: 'uppercase' }}>{entity.type}</span>
+                                            <div key={i} className={`entity-card role-${entity.role}`}>
+                                                <div className="entity-header">
+                                                    <span className="entity-name">{entity.name}</span>
+                                                    <span className="entity-type">{entity.type}</span>
                                                 </div>
-                                                <div style={{ fontSize: '0.85rem', color: '#aaa', marginTop: '4px' }}>{entity.description}</div>
+                                                <div className="entity-desc">{entity.description}</div>
                                             </div>
                                         ))}
                                     </div>
                                 </Section>
                             </div>
 
-                            {/* Right Column: Visual Storyboard */}
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                                <div style={{
-                                    padding: '15px', backgroundColor: '#252525', borderRadius: '8px',
-                                    display: 'flex', gap: '15px', alignItems: 'center'
-                                }}>
-                                    <span style={{ color: '#888', textTransform: 'uppercase', fontSize: '0.85rem', letterSpacing: '1px' }}>AI Director's Cut</span>
-                                    <div style={{ width: '1px', height: '20px', backgroundColor: '#444' }} />
-                                    <span style={{ color: '#eee' }}>Suggested Panels: <strong>{analysis.panel_guidance.panel_count}</strong></span>
+                            <div className="visual-col">
+                                <div className="directors-cut-bar">
+                                    <span className="director-label">AI Director's Cut</span>
+                                    <div className="director-divider" />
+                                    <span className="panel-count-label">Suggested Panels: <strong>{analysis.panel_guidance.panel_count}</strong></span>
                                 </div>
 
-                                {/* Panel Layout Visualization */}
-                                <div style={{
-                                    flex: 1,
-                                    display: 'grid',
-                                    gridTemplateColumns: `repeat(${Math.min(analysis.panel_guidance.panels.length, 3)}, 1fr)`,
-                                    gap: '20px',
-                                    alignContent: 'start'
-                                }}>
+                                <div className="panel-grid">
                                     {analysis.panel_guidance.panels.map((panel, idx) => {
-                                        // Use the AI-selected frame index, or fallback to sequential if out of bounds
                                         const framePath = framePaths[panel.best_frame_index] || framePaths[Math.min(idx, framePaths.length - 1)];
+                                        const isReveal = panel.role.toLowerCase().includes('reveal');
+                                        const roleClass = getRoleClass(panel.role);
 
                                         return (
-                                            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                                <div style={{
-                                                    position: 'relative',
-                                                    width: '100%',
-                                                    // No forced aspect ratio - let the content define it, but max-height to keep it sane
-                                                    maxHeight: '400px',
-                                                    borderRadius: '8px',
-                                                    overflow: 'hidden',
-                                                    border: '2px solid #333',
-                                                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                                                    backgroundColor: '#000', // Black bars for letterboxing
-                                                    display: 'flex',
-                                                    justifyContent: 'center',
-                                                    alignItems: 'center'
-                                                }}>
+                                            <div key={idx} className="panel-card">
+                                                <div
+                                                    onClick={() => setEditingPanelIndex(idx)}
+                                                    className={`panel-image-container ${roleClass} ${isReveal ? 'role-reveal' : ''}`}
+                                                >
                                                     <img
                                                         src={`file:///${framePath.replace(/\\/g, '/')}`}
-                                                        style={{
-                                                            maxWidth: '100%',
-                                                            maxHeight: '100%',
-                                                            width: 'auto',
-                                                            height: 'auto',
-                                                            objectFit: 'contain' // PREVENT CROPPING
-                                                        }}
+                                                        className="panel-image"
                                                     />
-                                                    <div style={{
-                                                        position: 'absolute', top: '10px', left: '10px',
-                                                        padding: '4px 8px', backgroundColor: 'rgba(0,0,0,0.8)',
-                                                        borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold'
-                                                    }}>
-                                                        Panel {panel.panel_index + 1}: {panel.role}
+                                                    <div className={`panel-badge ${isReveal ? 'reveal' : ''}`}>
+                                                        {isReveal ? '🌟 REVEAL' : `Panel ${panel.panel_index + 1}`}
+                                                        {!isReveal && <span className="role-label">| {panel.role}</span>}
+                                                    </div>
+
+                                                    {isReveal && (
+                                                        <div className="climax-label">
+                                                            Narrative Climax
+                                                        </div>
+                                                    )}
+
+                                                    <div className="swap-label">
+                                                        Click to swap frame
                                                     </div>
                                                 </div>
-                                                <div style={{ fontSize: '0.9rem', color: '#ccc', fontStyle: 'italic', padding: '0 5px' }}>
+                                                <div className="panel-description">
                                                     {panel.description}
                                                 </div>
                                             </div>
@@ -293,43 +267,80 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                 </div>
 
                                 {analysis.panel_guidance.omit_literal_action && (
-                                    <div style={{ padding: '15px', backgroundColor: 'rgba(255, 152, 0, 0.1)', border: '1px solid rgba(255, 152, 0, 0.3)', borderRadius: '8px', color: '#ffcc80' }}>
+                                    <div className="guidance-box guidance-creative">
                                         <strong>💡 Creative Note:</strong> The AI suggests <em>omitting the literal action</em> in favor of an implied or symbolic transition here.
+                                    </div>
+                                )}
+
+                                {analysis.panel_guidance.panels.some(p => p.role.toLowerCase().includes('reveal')) && (
+                                    <div className="guidance-box guidance-director">
+                                        <strong>🎬 Director's Recommendation:</strong> To make the <em>Reveal</em> land harder, try swapping the preceding panel for a <strong>Reaction shot</strong> or a <strong>Symbolic detail</strong>. This creates a "Gutter Jump" that lets the reader's imagination do the work.
                                     </div>
                                 )}
                             </div>
                         </>
                     )}
                 </div>
+
+                {editingPanelIndex !== null && (
+                    <div className="picker-overlay">
+                        <div className="picker-header">
+                            <h3>Select Frame for Panel {editingPanelIndex + 1}</h3>
+                            <button
+                                onClick={() => setEditingPanelIndex(null)}
+                                className="btn-secondary"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                        <div className="picker-grid">
+                            {framePaths.map((fp, i) => (
+                                <div
+                                    key={i}
+                                    onClick={() => handleFrameSelect(i)}
+                                    className={`picker-frame ${analysis?.panel_guidance.panels[editingPanelIndex].best_frame_index === i ? 'selected' : ''}`}
+                                >
+                                    <img
+                                        src={`file:///${fp.replace(/\\/g, '/')}`}
+                                        className="picker-image"
+                                    />
+                                    <div className="frame-index-badge">
+                                        Frame {i + 1}
+                                    </div>
+                                    {analysis?.panel_guidance.panels[editingPanelIndex].best_frame_index === i && (
+                                        <div className="selection-check">
+                                            ✓
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
 };
 
-// --- Helper Components ---
-
-const Section: React.FC<{ title: string; color: string; children: React.ReactNode }> = ({ title, color, children }) => (
-    <div style={{ backgroundColor: '#252525', borderRadius: '10px', padding: '15px', borderLeft: `4px solid ${color}` }}>
-        <h4 style={{ margin: '0 0 10px 0', color: color, fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{title}</h4>
-        <div style={{ color: '#ddd' }}>{children}</div>
+const Section: React.FC<{ title: string; className?: string; children: React.ReactNode }> = ({ title, className, children }) => (
+    <div className={`narrative-section ${className || ''}`}>
+        <h4 className="section-title">{title}</h4>
+        <div className="section-content">{children}</div>
     </div>
 );
 
-const Badge: React.FC<{ color: string; children: React.ReactNode }> = ({ color, children }) => (
-    <span style={{
-        display: 'inline-block', marginTop: '8px', padding: '4px 8px', borderRadius: '4px',
-        fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: `${color}33`, color: color, border: `1px solid ${color}66`
-    }}>
+const Badge: React.FC<{ variant?: 'irreversible'; children: React.ReactNode }> = ({ variant, children }) => (
+    <span className={`narrative-badge ${variant ? `badge-${variant}` : ''}`}>
         {children}
     </span>
 );
 
 const MetricBox: React.FC<{ label: string; value: number; max?: number; unit?: string }> = ({ label, value, max, unit }) => (
-    <div style={{ backgroundColor: '#252525', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
-        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '5px' }}>{label}</div>
-        <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#fff' }}>
+    <div className="metric-box">
+        <div className="metric-label">{label}</div>
+        <div className="metric-value">
             {value}{unit}
-            {max && <span style={{ fontSize: '1rem', color: '#555' }}>/{max}</span>}
+            {max && <span className="metric-max">/{max}</span>}
         </div>
     </div>
 );

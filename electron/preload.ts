@@ -150,6 +150,30 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   getVideoInfo: (filePath: string) =>
     ipcRenderer.invoke('get-video-info', filePath),
 
+  /**
+   * Check if extraction folder exists and contains frames.
+   */
+  checkExtractionExists: (outputDir: string) =>
+    ipcRenderer.invoke('check-extraction-exists', outputDir),
+
+  /**
+   * List all extracted frames in a directory.
+   */
+  listFrames: (outputDir: string) =>
+    ipcRenderer.invoke('list-frames', outputDir),
+
+  /**
+   * Save story timeline to disk.
+   */
+  saveStoryTimeline: (outputDir: string, timelineData: any) =>
+    ipcRenderer.invoke('save-story-timeline', outputDir, timelineData),
+
+  /**
+   * Load story timeline from disk.
+   */
+  loadStoryTimeline: (outputDir: string) =>
+    ipcRenderer.invoke('load-story-timeline', outputDir),
+
   // --------------------------------------------------------------------------
   // AI Analysis APIs
   // --------------------------------------------------------------------------

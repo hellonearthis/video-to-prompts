@@ -1,0 +1,29 @@
+.file-picker {
+    border: 2px dashed #666;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    background-color: transparent;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.file-picker:hover {
+    border-color: #888;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.file-picker.drag-active {
+    background-color: #333;
+    border-color: #007AFF;
+}
+
+.file-picker-title {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+}
+
+.file-picker-subtitle {
+    font-size: 0.9rem;
+    color: #888;
+}

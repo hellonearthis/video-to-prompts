@@ -16,6 +16,8 @@ import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo } from './ffmpeg'
+import fs from 'fs/promises'
+import { existsSync } from 'fs'
 import {
   analyzeFrame,
   analyzeFramesBatch,
@@ -173,6 +175,63 @@ app.whenReady().then(() => {
       filters: [{ name: 'Videos', extensions: ['mp4', 'mov', 'avi', 'mkv'] }]
     })
     return result.filePaths[0] || null
+  })
+
+  /**
+   * Check if extraction folder exists and contains frames.
+   */
+  ipcMain.handle('check-extraction-exists', async (_, outputDir) => {
+    try {
+      if (!existsSync(outputDir)) return { exists: false };
+      const files = await fs.readdir(outputDir);
+      const hasFrames = files.some(f => f.endsWith('.webp') || f.endsWith('.jpg') || f.endsWith('.png'));
+      return { exists: true, hasFrames, count: files.filter(f => f.endsWith('.webp') || f.endsWith('.jpg') || f.endsWith('.png')).length };
+    } catch (error) {
+      return { exists: false, error: String(error) };
+    }
+  })
+
+  /**
+   * List all extracted frames in a directory.
+   */
+  ipcMain.handle('list-frames', async (_, outputDir) => {
+    try {
+      const files = await fs.readdir(outputDir);
+      const frameFiles = files
+        .filter(f => f.endsWith('.webp') || f.endsWith('.jpg') || f.endsWith('.png'))
+        .map(f => path.join(outputDir, f))
+        .sort();
+      return { success: true, frames: frameFiles };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  })
+
+  /**
+   * Save story timeline to JSON in the extraction folder.
+   */
+  ipcMain.handle('save-story-timeline', async (_, outputDir, timelineData) => {
+    const filePath = path.join(outputDir, 'story_timeline.json');
+    try {
+      await fs.writeFile(filePath, JSON.stringify(timelineData, null, 2), 'utf-8');
+      return { success: true, path: filePath };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  })
+
+  /**
+   * Load story timeline from JSON in the extraction folder.
+   */
+  ipcMain.handle('load-story-timeline', async (_, outputDir) => {
+    const filePath = path.join(outputDir, 'story_timeline.json');
+    try {
+      if (!existsSync(filePath)) return { success: true, timeline: null };
+      const data = await fs.readFile(filePath, 'utf-8');
+      return { success: true, timeline: JSON.parse(data) };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
   })
 
   /**
