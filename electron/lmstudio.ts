@@ -550,7 +550,14 @@ SCHEMA:
 
         const analysis: SceneAnalysis = JSON.parse(text);
 
-        console.log('[LM-STUDIO] Sequence analysis complete.');
+        // Generate a deterministic scene_id based on the source frames
+        // This ensures that re-analyzing the same frames results in the same identity
+        const crypto = await import('crypto');
+        const sortedPaths = [...framePaths].sort();
+        const hash = crypto.createHash('md5').update(sortedPaths.join(',')).digest('hex');
+        analysis.scene_id = `scene_${hash.substring(0, 12)}`;
+
+        console.log(`[LM-STUDIO] Sequence analysis complete. ID: ${analysis.scene_id}`);
         return { success: true, analysis };
 
     } catch (error) {
