@@ -447,21 +447,20 @@ export const analyzeSequence = async (framePaths: string[]): Promise<SequenceAna
 
         const imageContent = framePaths.map((fp, index) => {
             if (!fs.existsSync(fp)) throw new Error(`File not found: ${fp}`);
-            const dims = fp.split('.');
-            const ext = dims[dims.length - 1]; // minimal ext check
-            const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+            const mime = getMimeType(fp);
             const b64 = fs.readFileSync(fp).toString('base64');
 
             return [
                 { type: "text", text: `Frame ${index + 1}:` },
-                { type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } }
+                {
+                    type: "image_url",
+                    image_url: { url: `data:${mime};base64,${b64}` }
+                }
             ];
         }).flat();
 
         content.push(...imageContent);
 
-        // "Story Witness" System Prompt
-        // Designed to force the model to look *between* the frames for narrative glue.
         const storyWitnessPrompt = `You are a STORY WITNESS and EXPERT CINEMATOGRAPHER.
 You are viewing a sequence of ${framePaths.length} frames (indexed 0 to ${framePaths.length - 1}) from a video scene.
 Your task is to analyze the narrative flow, character actions, and story beats.
@@ -518,28 +517,38 @@ SCHEMA:
 }
 `;
 
+        // Consolidate System Prompt into User Message for better compatibility
+        const finalContent = [
+            { type: "text", text: storyWitnessPrompt },
+            ...content
+        ];
+
+        console.log(`[LM-STUDIO] Sending request to ${LM_STUDIO_URL} with ${framePaths.length} frames`);
+
+        const payload = JSON.stringify({
+            model: "local-model",
+            messages: [
+                {
+                    role: "user",
+                    content: finalContent
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000
+        });
+
+        console.log(`[LM-STUDIO] Payload size: ${(payload.length / 1024 / 1024).toFixed(2)} MB`);
+
         const response = await fetch(LM_STUDIO_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: "local-model",
-                messages: [
-                    {
-                        role: "system",
-                        content: storyWitnessPrompt
-                    },
-                    {
-                        role: "user",
-                        content: content
-                    }
-                ],
-                temperature: 0.7,
-                max_tokens: 1000
-            })
+            body: payload
         });
 
         if (!response.ok) {
-            throw new Error(`LM Studio API Error: ${response.status}`);
+            const errorText = await response.text();
+            console.error(`[LM-STUDIO] API Error ${response.status}:`, errorText);
+            throw new Error(`LM Studio API Error: ${response.status} - ${errorText}`);
         }
 
         const result = await response.json();

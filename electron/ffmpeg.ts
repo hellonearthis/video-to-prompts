@@ -127,7 +127,7 @@ export const extractTimeFrames = async ({ filePath, outputDir, fps = 1 }: Extrac
         // -f image2: Output format is image sequence
         const args = [
             '-i', filePath,
-            '-vf', `fps=${fps}`,
+            '-vf', `fps=${fps},scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease`,
             '-an',
             '-f', 'image2',
             outputPattern
@@ -210,7 +210,7 @@ export const extractSceneChanges = async ({ filePath, outputDir, threshold = 0.3
         // -vsync vfr: Variable frame rate (only output selected frames)
         const args = [
             '-i', filePath,
-            '-vf', `select='gt(scene,${threshold})',showinfo`,
+            '-vf', `select='gt(scene,${threshold})',scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease,showinfo`,
             '-vsync', 'vfr',
             '-an',
             outputPattern
@@ -405,6 +405,7 @@ export const extractKeyframes = async ({ filePath, outputDir }: ExtractionOption
         const args = [
             '-skip_frame', 'nokey', // 1. Filter for keyframes *before* decoding
             '-i', filePath,
+            '-vf', "scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease",
             '-vsync', '0',          // 2. Prevent frame duplication/dropping
             '-an',                  // 3. Disable audio
             '-f', 'image2',

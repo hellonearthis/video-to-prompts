@@ -16,6 +16,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { ThumbnailGrid, FrameData } from './components/ThumbnailGrid';
 import { StoryboardView, SceneAnalysis } from './components/StoryboardView';
 import { TimelineStrip } from './components/TimelineStrip';
+import { FullStoryboardView } from './components/FullStoryboardView';
 
 /**
  * Video metadata type (matches VideoInfo from backend)
@@ -87,6 +88,7 @@ function App() {
   // Removed flow results logic
 
   const [storyboardOpen, setStoryboardOpen] = useState(false);
+  const [fullStoryboardOpen, setFullStoryboardOpen] = useState(false);
   const [storyboardFrames, setStoryboardFrames] = useState<string[]>([]);
   const [storyTimeline, setStoryTimeline] = useState<SceneAnalysis[]>([]);
   const [cachedAnalysis, setCachedAnalysis] = useState<SceneAnalysis | null>(null);
@@ -165,6 +167,11 @@ function App() {
     setFilePath(path);
     setVideoInfo(null);
     setFrames([]);
+    setStoryTimeline([]);
+    setStoryboardOpen(false);
+    setFullStoryboardOpen(false);
+    setCachedAnalysis(null);
+    setSelectedIndices(new Set());
   };
 
   const handleModelChange = () => {
@@ -501,7 +508,16 @@ function App() {
           <h1 className="header-title">Video to Prompts</h1>
           {filePath && (
             <button
-              onClick={() => { setFilePath(null); setVideoInfo(null); setFrames([]); }}
+              onClick={() => {
+                setFilePath(null);
+                setVideoInfo(null);
+                setFrames([]);
+                setStoryTimeline([]);
+                setStoryboardOpen(false);
+                setFullStoryboardOpen(false);
+                setCachedAnalysis(null);
+                setSelectedIndices(new Set());
+              }}
               className="btn-change-video"
             >
               Change Video
@@ -558,6 +574,7 @@ function App() {
             timeline={storyTimeline}
             onRemoveScene={handleRemoveFromTimeline}
             onViewScene={handleViewTimelineScene}
+            onViewFullStoryboard={() => setFullStoryboardOpen(true)}
           />
 
           {/* Control Panel */}
@@ -599,6 +616,13 @@ function App() {
             onExport={handleExportScene}
             initialAnalysis={cachedAnalysis}
             onAnalysisComplete={handleAnalysisComplete}
+            timeline={storyTimeline}
+          />
+
+          {/* Full Storyboard View */}
+          <FullStoryboardView
+            isOpen={fullStoryboardOpen}
+            onClose={() => setFullStoryboardOpen(false)}
             timeline={storyTimeline}
           />
         </>

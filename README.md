@@ -9,18 +9,20 @@ A desktop application that breaks down video clips into important visual compone
 - **Video Metadata**: Display duration, FPS, resolution, codec, and bitrate
 - **Smart Extraction**: Automatically detects existing extraction folders and offers to reuse frames or clear and re-run.
 - **Three Extraction Modes**:
-  - **Time Frames**: Extract frames at regular time intervals (configurable FPS)
-  - **Keyframes**: Extract actual video keyframes (I-frames from video encoding)
+  - **Time Frames**: Regular time intervals (configurable FPS)
+  - **Keyframes**: Actual video keyframes (I-frames)
   - **Scene Detection**: Detect and extract frames where significant visual changes occur
+- **Automatic Image Scaling**: Extracted frames are automatically scaled to a 640x420 (landscape) or 420x640 (portrait) bounding box to optimize AI analysis performance and memory usage.
 
 ### AI-Powered Analysis
 - **Frame Selection**: Click to select frames, Ctrl/Cmd+Click for multi-select, Shift+Click for range
 - **Analyze Selected/All**: Generate AI descriptions for individual frames
 - **Frame Comparison**: Select 2 frames to analyze the *action* and *object flow* between them
 - **Sequential Flow Analysis**: Select multiple frames (3+) to analyze the continuous flow of action and changes across the sequence
-- **Story Director's Cut**: Select multiple frames to generate a narrative storyboard, with AI-suggested panel layouts and narrative arc analysis
-- **Story Timeline Persistence**: Scenes added to the timeline are automatically saved to `story_timeline.json` and restored when reusing a project.
-- **Export to JSON**: Save all analysis data, comparison results, or full story timelines
+- **Full Storyboard View**: View all saved scenes as a continuous, scrollable narrative.
+- **Story Timeline Persistence**: Scenes are saved to `story_timeline.json` and restored automatically.
+- **Analysis Progress Feedback**: A real-time timer provides a life signal during long AI analyses.
+- **Export to JSON**: Save analysis data, comparison results, or full story timelines
 
 ### AI Analysis Output
 Each analyzed frame includes:
@@ -61,6 +63,18 @@ Story Analysis includes:
 3. Go to the **Local Server** tab (↔️ icon).
 4. Load the vision model and click **Start Server**.
 5. Ensure the server is running on port `1234`.
+
+### 2. LM Studio Troubleshooting & Limits
+
+If you encounter **Analysis Failed (API Error 400)**, it is usually related to model context or token limits.
+
+- **Context Window (Token Limits)**: 
+  - Vision models process images as large batches of tokens. Analyzing a "Story" with 4-6 frames can easily exceed default context limits.
+  - **The Fix**: In LM Studio's **Server Tab** (right sidebar), look for **"Context Length"** or **"Context Window"**. Set this to at least **10000** or **32000** (or higher if your GPU supports it).
+- **GPU Offload**: Ensure **GPU Offload** is enabled and set to "Max" if possible. Vision models are significantly slower and more prone to timeouts on CPU.
+- **Image Processing Capacity**:
+  - The application sends full-resolution frames. If you have low VRAM, try analyzing fewer frames at once.
+  - If the model crashes frequently, try a smaller quantized version of the vision model (e.g., 4-bit vs 8-bit).
 
 ### 2. Application Installation
 ```bash
@@ -106,6 +120,7 @@ npm run build
    - Click **"Analyze Story"** (in the action bar)
    - View the narrative breakdown and AI-suggested panel layout
    - **Add to Timeline**: Save the scene to your session timeline
+- **View Full Storyboard**: Click "📖 View Full Storyboard" in the timeline header to see the entire narrative sequence
 9. **Export results**:
    - **"Export JSON"**: Saves all analyzed frame data
    - **"Export to JSON"** (in comparison/story view): Saves specific analysis results

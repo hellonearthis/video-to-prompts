@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import './StoryboardView.css';
 
 interface StoryboardViewProps {
@@ -53,8 +53,10 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
 }) => {
     const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
     const [loading, setLoading] = useState(false);
+    const [elapsedTime, setElapsedTime] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [editingPanelIndex, setEditingPanelIndex] = useState<number | null>(null);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -65,13 +67,40 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
             } else if (framePaths.length > 0) {
                 analyzeStory();
             }
+        } else {
+            // Cleanup states and timer when closing
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+            setElapsedTime(0);
+            setLoading(false);
         }
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
     }, [isOpen, framePaths, initialAnalysis]);
 
     const analyzeStory = async () => {
+        // Clear any existing timer before starting
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+        }
+
         setLoading(true);
         setError(null);
         setAnalysis(null);
+        setElapsedTime(0);
+
+        const startTime = Date.now();
+        timerRef.current = setInterval(() => {
+            setElapsedTime(Math.round((Date.now() - startTime) / 1000));
+        }, 1000);
+
         try {
             console.log("Starting analysis for frames:", framePaths);
             const result = await window.ipcRenderer.analyzeStorySequence(framePaths);
@@ -89,6 +118,10 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
         } catch (err) {
             setError(err instanceof Error ? err.message : "Unknown error");
         } finally {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
             setLoading(false);
         }
     };
@@ -162,8 +195,14 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                 <div className="storyboard-content">
                     {loading && (
                         <div className="loading-overlay">
-                            <div className="spinner" />
-                            <p>analyzing narrative beats...</p>
+                            <div className="spinner-container">
+                                <div className="spinner" />
+                                <div className="loading-timer">{elapsedTime}s</div>
+                            </div>
+                            <div className="loading-text-container">
+                                <p className="loading-status">Analyzing Narrative Beats...</p>
+                                <p className="loading-subtext">Processing {framePaths.length} frames with AI</p>
+                            </div>
                         </div>
                     )}
 

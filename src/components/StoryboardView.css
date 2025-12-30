@@ -130,6 +130,42 @@
     color: var(--text-muted);
 }
 
+.spinner-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100px;
+    height: 100px;
+}
+
+.loading-timer {
+    position: absolute;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--reveal-color);
+}
+
+.loading-text-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.loading-status {
+    font-size: 1.1rem;
+    color: #fff !important;
+    font-weight: 600;
+    margin: 0;
+}
+
+.loading-subtext {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+
 .error-box {
     color: #ff4444;
     padding: 20px;
