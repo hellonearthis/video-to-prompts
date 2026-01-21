@@ -90,14 +90,57 @@ export interface FrameComparisonResult {
 // Analysis Functions
 // ============================================================================
 
+// ============================================================================
+// Prompt Management
+// ============================================================================
+
+let PROMPTS_CACHE: any = null;
+
+const loadPrompts = () => {
+    if (PROMPTS_CACHE) return PROMPTS_CACHE;
+    try {
+        // Try to locate the prompts file relative to the app execution
+        // In dev, it might be in root. In prod, slightly different.
+        // We'll try a few paths
+        const searchPaths = [
+            path.join(process.cwd(), 'qwen_vl3_prompts.json'),
+            path.join(__dirname, '../../qwen_vl3_prompts.json'),
+            path.join(__dirname, '../../../qwen_vl3_prompts.json')
+        ];
+
+        for (const p of searchPaths) {
+            if (fs.existsSync(p)) {
+                console.log(`[LM-STUDIO] Loading prompts from ${p}`);
+                const data = fs.readFileSync(p, 'utf-8');
+                PROMPTS_CACHE = JSON.parse(data);
+                return PROMPTS_CACHE;
+            }
+        }
+        console.warn('[LM-STUDIO] Prompts file not found, using defaults');
+        return null;
+    } catch (e) {
+        console.error('[LM-STUDIO] Failed to load prompts:', e);
+        return null;
+    }
+};
+
+export const getAvailablePrompts = (): string[] => {
+    const data = loadPrompts();
+    if (data && data._preset_prompts) {
+        return data._preset_prompts;
+    }
+    return ["Default"];
+};
+
 /**
  * Analyzes a single image frame using LM Studio's vision model.
  * 
  * @param imagePath - Absolute path to the image file
+ * @param promptType - Optional key for the prompt to use (from qwen_vl3_prompts.json)
  * @returns Promise resolving to analysis result
  */
-export const analyzeFrame = async (imagePath: string): Promise<AnalysisResult> => {
-    console.log('[LM-STUDIO] Analyzing frame:', imagePath);
+export const analyzeFrame = async (imagePath: string, promptType?: string): Promise<AnalysisResult> => {
+    console.log(`[LM-STUDIO] Analyzing frame: ${imagePath} with prompt: ${promptType || 'Default'}`);
 
     try {
         // Read image file and convert to base64
@@ -111,8 +154,56 @@ export const analyzeFrame = async (imagePath: string): Promise<AnalysisResult> =
 
         console.log(`[LM-STUDIO] Image size: ${imageBuffer.length} bytes, type: ${mimeType}`);
 
-        // Build the analysis prompt
-        const prompt = `Analyze this image and return ONLY a JSON object with this exact structure:
+        // Load prompts
+        const prompts = loadPrompts();
+        let promptText = "";
+
+        // Determine prompt to use
+        if (promptType && prompts && prompts.qwenvl && prompts.qwenvl[promptType]) {
+            promptText = prompts.qwenvl[promptType];
+
+            // If it's the "Detailed Analysis" prompt, we need to guide the JSON output specifically
+            // Or if the user expects JSON, we should wrap it.
+            // The existing code expects a specific JSON structure.
+            // PROMPT ADAPTATION:
+            // If the custom prompt doesn't ask for JSON, the parser will fail.
+            // We need to decide: does the user want PURE text output for these new prompts?
+            // "simple description" says "write a single concise sentence".
+            // The existing return type `FrameAnalysis` EXPECTS structure.
+            // We might need to adjust the return type or wrap the prompt.
+
+            // STRATEGY: 
+            // 1. If strict JSON structure is required (original behavior), we interpret the prompt instructions 
+            //    embedded in our system prompt.
+            // 2. BUT the new prompts are "Text descriptions".
+            //    "Tags", "Simple Description", "Detailed Description" etc.
+            //    They return TEXT.
+            //    We should probably place this text into the `summary` field or `description` field of the analysis.
+
+            // So we will construct a prompt that asks the model to output JSON where the specific field is populated by the prompt's result.
+            // Actually, simpler: Let's ask for JSON, but tell the model to use the "User Prompt" logic to fill the "summary".
+
+            const basePrompt = `Analyze this image.
+Task: ${promptText}
+
+Return a JSON object with this structure:
+{
+    "summary": "The result of the specific task (description, story, etc)",
+    "objects": ["list", "of", "visible", "objects" (only if relevant, else empty)],
+    "tags": ["list", "of", "tags" (only if relevant, else empty)],
+    "scene_type": "scene type",
+    "visual_elements": {
+        "dominant_colors": [],
+        "lighting": ""
+    }
+}
+Do not include markdown formatting.`;
+
+            promptText = basePrompt;
+
+        } else {
+            // Default hardcoded prompt
+            promptText = `Analyze this image and return ONLY a JSON object with this exact structure:
 {
 "summary": "A concise description of the image content.",
 "objects": ["list", "of", "visible", "objects"],
@@ -124,6 +215,8 @@ export const analyzeFrame = async (imagePath: string): Promise<AnalysisResult> =
 }
 }
 Do not include markdown formatting or explanations.`;
+        }
+
 
         // Send request to LM Studio
         const response = await fetch(LM_STUDIO_URL, {
@@ -132,12 +225,12 @@ Do not include markdown formatting or explanations.`;
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: "local-model",
+                model: await getCurrentModel(),
                 messages: [
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: prompt },
+                            { type: "text", text: promptText },
                             {
                                 type: "image_url",
                                 image_url: {
@@ -170,7 +263,16 @@ Do not include markdown formatting or explanations.`;
         } catch (jsonError) {
             console.error('[LM-STUDIO] JSON parse error:', jsonError);
             console.error('[LM-STUDIO] Response text:', text);
-            throw new Error('Failed to parse AI response as JSON');
+
+            // Fallback for non-JSON responses (if model ignored instructions)
+            // We put the whole text into summary
+            analysis = {
+                summary: text,
+                objects: [],
+                tags: [],
+                scene_type: 'unknown',
+                visual_elements: { dominant_colors: [], lighting: '' }
+            };
         }
 
         // Deduplicate: remove tags that match objects
@@ -244,7 +346,7 @@ Do not include markdown formatting.`;
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: "local-model",
+                model: await getCurrentModel(),
                 messages: [
                     {
                         role: "user",
@@ -319,14 +421,15 @@ Do not include markdown formatting.`;
  */
 export const analyzeFramesBatch = async (
     imagePaths: string[],
+    promptType?: string,
     onProgress?: (current: number, total: number, result: AnalysisResult) => void
 ): Promise<AnalysisResult[]> => {
-    console.log(`[LM-STUDIO] Starting batch analysis of ${imagePaths.length} frames`);
+    console.log(`[LM-STUDIO] Starting batch analysis of ${imagePaths.length} frames with prompt: ${promptType || 'Default'}`);
 
     const results: AnalysisResult[] = [];
 
     for (let i = 0; i < imagePaths.length; i++) {
-        const result = await analyzeFrame(imagePaths[i]);
+        const result = await analyzeFrame(imagePaths[i], promptType);
         results.push(result);
 
         if (onProgress) {
@@ -355,6 +458,31 @@ export const checkLMStudioConnection = async (): Promise<boolean> => {
         return false;
     }
 };
+
+/**
+ * Gets the currently loaded model ID from LM Studio.
+ */
+async function getCurrentModel(): Promise<string> {
+    try {
+        const response = await fetch(LM_STUDIO_URL.replace('/chat/completions', '/models'), {
+            method: 'GET',
+            signal: AbortSignal.timeout(3000)
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            // LM Studio usually returns the loaded model as the first item or specifically active
+            if (data.data && data.data.length > 0) {
+                const modelId = data.data[0].id;
+                console.log(`[LM-STUDIO] Using model: ${modelId}`);
+                return modelId;
+            }
+        }
+    } catch (e) {
+        console.warn('[LM-STUDIO] Failed to fetch current model, using fallback');
+    }
+    return "local-model"; // Fallback
+}
 
 // ============================================================================
 // Helper Functions
@@ -526,7 +654,7 @@ SCHEMA:
         console.log(`[LM-STUDIO] Sending request to ${LM_STUDIO_URL} with ${framePaths.length} frames`);
 
         const payload = JSON.stringify({
-            model: "local-model",
+            model: await getCurrentModel(),
             messages: [
                 {
                     role: "user",

@@ -75,6 +75,7 @@ let win: BrowserWindow | null
 function createWindow() {
   win = new BrowserWindow({
     icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    autoHideMenuBar: true,
     webPreferences: {
       // Preload script runs before renderer, sets up IPC bridge
       preload: path.join(__dirname, 'preload.mjs'),
@@ -83,6 +84,9 @@ function createWindow() {
       webSecurity: false,
     },
   })
+
+  // Start maximized
+  win.maximize();
 
   // Send a message to renderer when page loads (for debugging)
   win.webContents.on('did-finish-load', () => {
@@ -313,17 +317,25 @@ app.whenReady().then(() => {
   })
 
   /**
+   * Get available prompts from prompts file.
+   */
+  ipcMain.handle('get-available-prompts', async () => {
+    const { getAvailablePrompts } = await import('./lmstudio');
+    return { prompts: getAvailablePrompts() };
+  })
+
+  /**
    * Analyze a single frame using LM Studio.
    */
-  ipcMain.handle('analyze-frame', async (_, imagePath) => {
-    return await analyzeFrame(imagePath);
+  ipcMain.handle('analyze-frame', async (_, imagePath, promptType) => {
+    return await analyzeFrame(imagePath, promptType);
   })
 
   /**
    * Analyze multiple frames in batch using LM Studio.
    */
-  ipcMain.handle('analyze-frames-batch', async (_, imagePaths: string[]) => {
-    return await analyzeFramesBatch(imagePaths, (current, total, result) => {
+  ipcMain.handle('analyze-frames-batch', async (_, imagePaths: string[], promptType?: string) => {
+    return await analyzeFramesBatch(imagePaths, promptType, (current, total, result) => {
       // Notify progress to renderer
       win?.webContents.send('analysis-progress', { current, total, result });
     });
@@ -383,7 +395,7 @@ app.whenReady().then(() => {
    * Analyze a story sequence (batch of frames) for narrative structure.
    */
   ipcMain.handle('analyze-story-sequence', async (_, imagePaths: string[]) => {
-    const { analyzeSequence } = await import('./lmstudio'); // dynamic import
+    const { analyzeSequence } = await import('./lmstudio');
     return await analyzeSequence(imagePaths);
   })
 

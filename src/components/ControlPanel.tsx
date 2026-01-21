@@ -11,15 +11,13 @@ import './ControlPanel.css';
 interface ControlPanelProps {
     /** Frames per second to extract for time-based mode */
     fps: number;
-    /** Number of frames currently extracted */
-    framesCount: number;
     /** Callback to update fps value */
     setFps: (val: number) => void;
 
     /** Current scene detection threshold value (0.1 - 1.0) */
-    threshold: number;
+    sceneDetectionThreshold: number;
     /** Callback to update the threshold value */
-    setThreshold: (val: number) => void;
+    setSceneDetectionThreshold: (val: number) => void;
 
     /** Whether time-based frame extraction is enabled */
     extractTimeFrames: boolean;
@@ -45,6 +43,13 @@ interface ControlPanelProps {
     selectedModel: string;
     /** Callback to update selected model */
     onModelChange: () => void;
+
+    /** List of available prompts */
+    availablePrompts: string[];
+    /** Currently selected prompt */
+    selectedPrompt: string;
+    /** Callback to change prompt */
+    onPromptChange: (val: string) => void;
 }
 
 // ============================================================================
@@ -54,8 +59,8 @@ interface ControlPanelProps {
 export const ControlPanel: React.FC<ControlPanelProps> = ({
     fps,
     setFps,
-    threshold,
-    setThreshold,
+    sceneDetectionThreshold,
+    setSceneDetectionThreshold,
     extractTimeFrames,
     setExtractTimeFrames,
     extractKeyframes,
@@ -66,7 +71,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     isProcessing,
     selectedModel,
     onModelChange,
-    framesCount
+    availablePrompts,
+    selectedPrompt,
+    onPromptChange
 }) => {
     return (
         <div className="control-panel-container">
@@ -94,7 +101,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           -------------------------------------------------------------------------- */}
             <div className="control-group">
                 <label htmlFor="threshold" className="control-label">
-                    Scene Threshold: {threshold}
+                    Scene Threshold: {sceneDetectionThreshold}
                 </label>
                 <input
                     id="threshold"
@@ -102,8 +109,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     min="0.1"
                     max="1.0"
                     step="0.05"
-                    value={threshold}
-                    onChange={(e) => setThreshold(parseFloat(e.target.value))}
+                    value={sceneDetectionThreshold}
+                    onChange={(e) => setSceneDetectionThreshold(parseFloat(e.target.value))}
                     disabled={isProcessing}
                     className="control-input-range"
                 />
@@ -147,6 +154,21 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             {/* --------------------------------------------------------------------------
               AI Model / API Status
               -------------------------------------------------------------------------- */}
+            <div className="control-group">
+                <label className="control-label">Analysis Prompt</label>
+                <select
+                    value={selectedPrompt}
+                    onChange={(e) => onPromptChange(e.target.value)}
+                    className="control-select"
+                    disabled={isProcessing}
+                >
+                    {availablePrompts.length === 0 && <option value="Default">Default</option>}
+                    {availablePrompts.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                    ))}
+                </select>
+            </div>
+
             <div className="control-group">
                 <label className="control-label">AI Engine</label>
                 <button

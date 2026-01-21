@@ -35,9 +35,18 @@ interface ThumbnailGridProps {
     selectedIndices: Set<number>;
     onSelectionChange: (indices: Set<number>) => void;
     onAnalyzeStory: () => void;
-    isDescribing: boolean;
+    /** Callback to analyze selected frames individually */
+    onAnalyzeFrames: () => void;
+    isAnalyzing: boolean;
     analysisProgress?: { current: number; total: number };
     hasAnalyzedFrames: boolean;
+    hiddenPaths: Set<string>;
+    showHidden: boolean;
+    onUnhide: (path: string) => void;
+    showExtractionPanel: boolean;
+    onToggleExtractionPanel: () => void;
+    onHideSelected: () => void;
+    onToggleShowHidden: () => void;
 }
 
 // ============================================================================
@@ -49,9 +58,16 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
     selectedIndices,
     onSelectionChange,
     onAnalyzeStory,
-    isDescribing,
+    onAnalyzeFrames,
+    isAnalyzing,
     analysisProgress,
-    hasAnalyzedFrames
+    hiddenPaths,
+    showHidden,
+    onUnhide,
+    showExtractionPanel,
+    onToggleExtractionPanel,
+    onHideSelected,
+    onToggleShowHidden
 }) => {
 
     // Handle frame click for selection
@@ -114,8 +130,43 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                 </div>
 
                 <div className="header-actions">
+                    {/* Toggle Extraction Panel */}
+                    <button
+                        onClick={onToggleExtractionPanel}
+                        className={`btn-toggle-extraction ${showExtractionPanel ? 'active' : ''}`}
+                        title={showExtractionPanel ? "Hide Extraction Panel" : "Show Extraction Panel"}
+                    >
+                        ⚙️ {showExtractionPanel ? 'Hide Controls' : 'Extraction Controls'}
+                    </button>
+
+                    {/* Divider */}
+                    <div style={{ width: '1px', height: '20px', background: '#444', margin: '0 5px' }}></div>
+
+                    {/* Visibility Controls */}
+                    <button
+                        onClick={onHideSelected}
+                        disabled={selectedIndices.size === 0}
+                        className="btn-select-all"
+                        style={{ border: '1px solid #666', color: selectedIndices.size > 0 ? '#ffb74d' : '#666' }}
+                        title="Hide selected frames"
+                    >
+                        Hide Selected {selectedIndices.size > 0 ? `(${selectedIndices.size})` : ''}
+                    </button>
+
+                    <label className="checkbox-label" style={{ fontSize: '0.8rem', color: '#aaa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <input
+                            type="checkbox"
+                            checked={showHidden}
+                            onChange={onToggleShowHidden}
+                        />
+                        Show Hidden ({hiddenPaths.size})
+                    </label>
+
+                    {/* Divider */}
+                    <div style={{ width: '1px', height: '20px', background: '#444', margin: '0 5px' }}></div>
+
                     {/* Progress indicator */}
-                    {isDescribing && analysisProgress && (
+                    {isAnalyzing && analysisProgress && (
                         <span className="analysis-progress-text">
                             Analyzing {analysisProgress.current}/{analysisProgress.total}...
                         </span>
@@ -129,9 +180,17 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                     </button>
 
                     <button
+                        onClick={onAnalyzeFrames}
+                        disabled={selectedIndices.size === 0 || isAnalyzing}
+                        className={`btn-analyze-frames ${selectedIndices.size > 0 && !isAnalyzing ? 'active' : 'disabled'}`}
+                    >
+                        Analyze Item(s)
+                    </button>
+
+                    <button
                         onClick={onAnalyzeStory}
-                        disabled={selectedIndices.size < 2 || isDescribing}
-                        className={`btn-analyze-story ${selectedIndices.size >= 2 && !isDescribing ? 'active' : 'disabled'}`}
+                        disabled={selectedIndices.size < 2 || isAnalyzing}
+                        className={`btn-analyze-story ${selectedIndices.size >= 2 && !isAnalyzing ? 'active' : 'disabled'}`}
                         title="Select at least 2 frames for narrative analysis"
                     >
                         Analyze Story
@@ -142,16 +201,47 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
             {/* Responsive Grid */}
             <div className="thumbnail-grid-layout">
                 {frames.map((frame, index) => {
-                    const isSelected = selectedIndices.has(index);
-
                     if (!frame || !frame.path) return null;
+
+                    const isSelected = selectedIndices.has(index);
+                    const isHidden = hiddenPaths.has(frame.path);
+
+                    // Skip if hidden and not showing hidden
+                    if (isHidden && !showHidden) return null;
 
                     return (
                         <div
                             key={`${frame.path}-${index}`}
                             onClick={(e) => handleFrameClick(index, e)}
-                            className={`frame-card ${isSelected ? 'selected' : ''}`}
+                            className={`frame-card ${isSelected ? 'selected' : ''} ${isHidden ? 'hidden-frame' : ''}`}
+                            style={isHidden ? { opacity: 0.5, filter: 'grayscale(100%)' } : {}}
                         >
+                            {/* Hidden Indicator / Unhide Button */}
+                            {isHidden && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onUnhide(frame.path);
+                                    }}
+                                    className="btn-unhide"
+                                    title="Click to Unhide"
+                                    style={{
+                                        position: 'absolute',
+                                        top: 5,
+                                        right: 5,
+                                        zIndex: 10,
+                                        background: 'rgba(0,0,0,0.7)',
+                                        color: 'white',
+                                        border: '1px solid #666',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        padding: '2px 6px',
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    (H)
+                                </button>
+                            )}
                             {/* Thumbnail */}
                             <div className="frame-thumbnail-container">
                                 <img

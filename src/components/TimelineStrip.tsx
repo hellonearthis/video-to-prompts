@@ -6,14 +6,12 @@ interface TimelineStripProps {
     timeline: SceneAnalysis[];
     onRemoveScene: (index: number) => void;
     onViewScene: (scene: SceneAnalysis) => void;
-    onViewFullStoryboard: () => void;
 }
 
 export const TimelineStrip: React.FC<TimelineStripProps> = ({
     timeline,
     onRemoveScene,
-    onViewScene,
-    onViewFullStoryboard
+    onViewScene
 }) => {
     if (timeline.length === 0) return null;
 
@@ -26,12 +24,6 @@ export const TimelineStrip: React.FC<TimelineStripProps> = ({
                         {timeline.length} Scenes
                     </span>
                 </div>
-                <button
-                    onClick={onViewFullStoryboard}
-                    className="btn-view-storyboard"
-                >
-                    📖 View Full Storyboard
-                </button>
             </div>
 
             <div className="timeline-strip-scroll">

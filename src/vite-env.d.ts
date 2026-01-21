@@ -93,8 +93,8 @@ interface FlowAnalysisResult {
 interface Window {
     ipcRenderer: {
         selectFile: () => Promise<string | null>;
-        extractTimeFrames: (filePath: string, outputDir: string, fps?: number) => Promise<string[]>;
-        extractKeyframes: (filePath: string, outputDir: string) => Promise<string[]>;
+        extractTimeFrames: (filePath: string, outputDir: string, fps?: number) => Promise<{ path: string; time: number }[]>;
+        extractKeyframes: (filePath: string, outputDir: string) => Promise<{ path: string; time: number }[]>;
         extractSceneChanges: (filePath: string, outputDir: string, threshold: number) => Promise<{ path: string; time: number; pts: number; frame: number }[]>;
         getVideoInfo: (filePath: string) => Promise<VideoInfo>;
         checkExtractionExists: (outputDir: string) => Promise<{ exists: boolean; hasFrames?: boolean; count?: number; error?: string }>;
@@ -102,9 +102,10 @@ interface Window {
         saveStoryTimeline: (outputDir: string, timelineData: any) => Promise<{ success: boolean; path?: string; error?: string }>;
         loadStoryTimeline: (outputDir: string) => Promise<{ success: boolean; timeline?: any; error?: string }>;
         checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
+        getAvailablePrompts: () => Promise<{ prompts: string[] }>;
         initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;
-        analyzeFrame: (imagePath: string) => Promise<AnalysisResult>;
-        analyzeFramesBatch: (paths: string[]) => Promise<any>;
+        analyzeFrame: (imagePath: string, promptType?: string) => Promise<AnalysisResult>;
+        analyzeFramesBatch: (paths: string[], promptType?: string) => Promise<any>;
         compareFrames: (f1: string, f2: string) => Promise<any>;
         compareSequential: (paths: string[]) => Promise<{ success: boolean; results?: any[]; error?: string }>;
         analyzeStorySequence: (paths: string[]) => Promise<{ success: boolean; analysis?: any; error?: string }>;

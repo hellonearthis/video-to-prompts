@@ -14,8 +14,8 @@
   min-height: 100vh;
   background-color: #1e1e1e;
   color: #eee;
-  padding-bottom: 35px;
-  /* Space for fixed status bar */
+  padding-bottom: 120px;
+  /* Space for fixed control panel + grid header */
 }
 
 /* --- Header --- */
@@ -55,46 +55,7 @@
   color: #ccc;
 }
 
-/* --- Status Bar (Secondary) --- */
-.status-bar-secondary {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 16px;
-  background-color: #1e1e1e;
-  border-bottom: 1px solid #333;
-  font-size: 0.85rem;
-}
 
-.status-bar-info {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.engine-status {
-  color: #aaa;
-}
-
-.engine-status.connected {
-  color: #4caf50;
-}
-
-.engine-status.disconnected {
-  color: #f44336;
-}
-
-.analysis-status {
-  color: #007AFF;
-}
-
-.file-path-display {
-  color: #aaa;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 400px;
-}
 
 /* --- Empty State --- */
 .empty-state-container {
@@ -110,14 +71,64 @@
 }
 
 /* --- Video Info Bar --- */
+/* --- Video Info Bar --- */
 .video-info-bar {
-  padding: 10px 20px;
+  padding: 12px 20px;
   background-color: #2a2a2a;
   border-bottom: 1px solid #333;
   display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
   font-size: 0.85rem;
+  flex-wrap: nowrap;
+}
+
+.video-info-left,
+.video-info-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.video-info-center {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: center;
+  flex: 2;
+}
+
+.video-info-right {
+  justify-content: flex-end;
+}
+
+.file-name-display {
+  font-weight: 600;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.file-path-display {
+  color: #888;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+
+.analysis-status {
+  color: #007AFF;
 }
 
 .ai-status-indicator {

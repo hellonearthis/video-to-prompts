@@ -110,21 +110,25 @@ export type ExtractionOptions = {
  * // Extract 2 frames per second
  * const frames = await extractTimeFrames({ filePath: 'video.mp4', outputDir: './frames', fps: 2 });
  */
-export const extractTimeFrames = async ({ filePath, outputDir, fps = 1 }: ExtractionOptions): Promise<string[]> => {
+// ... imports ...
+
+export interface FrameData {
+    path: string;
+    time: number;
+}
+
+// ... existing types ...
+
+// ... Time-Based Frame Extraction ...
+
+export const extractTimeFrames = async ({ filePath, outputDir, fps = 1 }: ExtractionOptions): Promise<FrameData[]> => {
     return new Promise((resolve, reject) => {
         // Ensure output directory exists
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
 
-        // Output pattern: time_0001.png, time_0002.png, etc.
         const outputPattern = path.join(outputDir, 'time_%04d.png');
-
-        // Build FFmpeg command arguments
-        // -i: Input file
-        // -vf fps=N: Extract N frames per second
-        // -an: Disable audio processing (not needed for frame extraction)
-        // -f image2: Output format is image sequence
         const args = [
             '-i', filePath,
             '-vf', `fps=${fps},scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease`,
@@ -134,31 +138,32 @@ export const extractTimeFrames = async ({ filePath, outputDir, fps = 1 }: Extrac
         ];
 
         console.log('Running FFmpeg with args:', args.join(' '));
-
-        // Spawn FFmpeg process
         const proc = spawn(getFfmpegPath(), args);
 
-        // Log FFmpeg output for debugging
         proc.stderr.on('data', (data) => {
             console.log('FFmpeg stderr:', data.toString());
         });
 
-        // Handle process completion
         proc.on('close', (code) => {
             if (code === 0) {
                 console.log('Time-based frame extraction finished');
-                // Read output directory and return list of extracted files
                 const files = fs.readdirSync(outputDir)
                     .filter(f => f.startsWith('time_') && f.endsWith('.png'))
                     .sort();
-                console.log('Found time-based frame files:', files);
-                resolve(files.map(f => path.join(outputDir, f)));
+
+                // Calculate time based on index and fps
+                const result: FrameData[] = files.map((f, i) => ({
+                    path: path.join(outputDir, f),
+                    time: i / fps
+                }));
+
+                console.log('Found time-based frame files:', result.length);
+                resolve(result);
             } else {
                 reject(new Error(`FFmpeg exited with code ${code}`));
             }
         });
 
-        // Handle process errors (e.g., FFmpeg not found)
         proc.on('error', (err) => {
             console.error('FFmpeg process error:', err);
             reject(err);
@@ -182,14 +187,6 @@ export const extractTimeFrames = async ({ filePath, outputDir, fps = 1 }: Extrac
  * 
  * @param options - Extraction options including file path, output directory, and threshold
  * @returns Promise resolving to array of frame data with metadata
- * 
- * @example
- * // Detect scene changes with default threshold (0.3)
- * const scenes = await extractSceneChanges({ filePath: 'video.mp4', outputDir: './scenes' });
- * 
- * @example
- * // More sensitive detection (lower threshold)
- * const scenes = await extractSceneChanges({ filePath: 'video.mp4', outputDir: './scenes', threshold: 0.1 });
  */
 export const extractSceneChanges = async ({ filePath, outputDir, threshold = 0.3 }: ExtractionOptions): Promise<{ path: string; time: number; pts: number; frame: number }[]> => {
     return new Promise((resolve, reject) => {
@@ -368,76 +365,64 @@ export const getVideoInfo = async (filePath: string): Promise<VideoInfo> => {
 // Keyframe (I-Frame) Extraction
 // ============================================================================
 
-/**
- * Extracts actual keyframes (I-frames) from a video.
- * 
- * Video codecs like H.264 use different frame types:
- * - I-frames (Intra-frames): Complete images, used as keyframes
- * - P-frames: Predicted from previous frames
- * - B-frames: Bidirectionally predicted
- * 
- * This function extracts only the I-frames, which are the "true" keyframes
- * in the video encoding. The number and timing of keyframes depends on
- * how the video was encoded (typically every 1-5 seconds).
- * 
- * Uses the FFmpeg command:
- * ffmpeg -skip_frame nokey -i input.mp4 -vsync 0 keyframe-%03d.png
- * 
- * @param options - Extraction options including file path and output directory
- * @returns Promise resolving to an array of extracted frame file paths
- */
-export const extractKeyframes = async ({ filePath, outputDir }: ExtractionOptions): Promise<string[]> => {
+export const extractKeyframes = async ({ filePath, outputDir }: ExtractionOptions): Promise<FrameData[]> => {
     return new Promise((resolve, reject) => {
-        // Ensure output directory exists
         if (!fs.existsSync(outputDir)) { fs.mkdirSync(outputDir, { recursive: true }); }
 
-        // Output pattern: key_0001.png, key_0002.png, etc.
-        // I've changed the pattern slightly to better match the new
-        // FFmpeg command's output structure (you can adjust %04d if needed).
         const outputPattern = path.join(outputDir, 'key_%04d.png');
+        const frames: { frame: number, time: number, path: string }[] = [];
 
-        // Build FFmpeg command arguments for REAL KEYFRAME EXTRACTION
-        // -skip_frame nokey: Skip all non-keyframes
-        // -i: Input file
-        // -vsync 0: Prevents frame duplication/dropping, important for keyframes
-        // -f image2: Output format is image sequence (optional, often inferred)
-        // -an: Disable audio processing (still useful)
+        // Updated command to include showinfo for timestamp extraction
+        // Note: skip_frame nokey interacts with showinfo. showinfo might NOT show dropped frames.
+        // We use select='eq(pict_type,I)' instead of skip_frame to ensure showinfo sees and reports the frames we keep.
         const args = [
-            '-skip_frame', 'nokey', // 1. Filter for keyframes *before* decoding
             '-i', filePath,
-            '-vf', "scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease",
-            '-vsync', '0',          // 2. Prevent frame duplication/dropping
-            '-an',                  // 3. Disable audio
-            '-f', 'image2',
-            outputPattern           // 4. Output pattern
+            '-vf', `select='eq(pict_type,I)',scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease,showinfo`,
+            '-vsync', 'vfr', // Variable frame rate to output only selected frames
+            '-an',
+            outputPattern
         ];
 
-        console.log('Running FFmpeg with args:', args.join(' '));
-
-        // Spawn FFmpeg process
+        console.log('Running FFmpeg keyframe extraction with args:', args.join(' '));
         const proc = spawn(getFfmpegPath(), args);
 
-        // Log FFmpeg output for debugging
         proc.stderr.on('data', (data) => {
-            console.log('FFmpeg stderr:', data.toString());
+            const lines = data.toString().split('\n');
+            for (const line of lines) {
+                if (line.includes('[Parsed_showinfo')) {
+                    const timeMatch = line.match(/pts_time:([\d.]+)/);
+                    if (timeMatch) {
+                        frames.push({
+                            path: '', // Filled later
+                            frame: 0, // Not strictly needed
+                            time: parseFloat(timeMatch[1])
+                        });
+                    }
+                }
+            }
         });
 
-        // Handle process completion
         proc.on('close', (code) => {
             if (code === 0) {
                 console.log('Keyframe extraction finished');
-                // Read output directory and return list of extracted files
                 const files = fs.readdirSync(outputDir)
                     .filter(f => f.startsWith('key_') && f.endsWith('.png'))
                     .sort();
-                console.log('Found keyframe files:', files);
-                resolve(files.map(f => path.join(outputDir, f)));
+
+                // Merge timestamps with files
+                // Assuming showinfo output order matches file output order
+                const result: FrameData[] = files.map((f, i) => ({
+                    path: path.join(outputDir, f),
+                    time: frames[i]?.time || 0 // Fallback if parsing missed something
+                }));
+
+                console.log('Found keyframe files:', result.length);
+                resolve(result);
             } else {
                 reject(new Error(`FFmpeg exited with code ${code}`));
             }
         });
 
-        // Handle process errors (e.g., FFmpeg not found)
         proc.on('error', (err) => {
             console.error('FFmpeg process error:', err);
             reject(err);

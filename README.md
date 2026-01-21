@@ -47,6 +47,8 @@ Story Analysis includes:
     - 🟠 **Reaction**: Emotional beats and subtext
     - 🟣 **Reveal**: Narrative climax and significant shifts
 - **Panel Guidance**: AI-suggested comic panel layout, selecting the *best* frames for specific beats
+- **Deduplication Logic**: Automatically ensures that "objects" and "tags" are mutually exclusive for cleaner analysis results.
+- **Custom Tooltips**: Enhanced UI with custom, styled tooltips for timeline events and status indicators.
 
 ## Requirements
 
@@ -54,6 +56,34 @@ Story Analysis includes:
 - **LM Studio** running locally at `http://localhost:1234`
   - **Model**: Requires a vision-capable model (e.g., `qwen/qwen3-vl-4b` or `llava`)
   - **Local Server**: Must have the "Local Server" started in LM Studio.
+
+### 3. Custom Prompts Configuration
+
+You can customize the AI analysis behavior by editing the `qwen_vl3_prompts.json` file located in the root directory (or alongside the executable).
+
+#### **File Structure**
+```json
+{
+  "_preset_prompts": [
+    "Tags",
+    "Simple Description",
+    "Ultra Cinematic Detailed"
+  ],
+  "qwenvl": {
+    "Tags": "...",
+    "Simple Description": "...",
+    "Ultra Cinematic Detailed": "..."
+  }
+}
+```
+
+#### **How It Works**
+1.  **Loading**: On startup, the app loads `qwen_vl3_prompts.json`.
+2.  **Dropdown**: The `_preset_prompts` list populates the "Analysis Prompt" dropdown in the sidebar.
+3.  **Single/Batch Analysis**: When you click **"Analyze Item(s)"**, the app sends the prompt text corresponding to your selected key (e.g., `qwenvl["Tags"]`) to the AI.
+4.  **Story Analysis (Dual Phase)**: 
+    -   **Phase 1**: Uses a built-in "Story Witness" prompt to determine narrative structure.
+    -   **Phase 2**: Automatically uses the `"Ultra Cinematic Detailed"` prompt from the JSON to generate high-fidelity visual descriptions for each storyboard panel. You can edit this specific key in the JSON to change the style of the final storyboard descriptions.
 
 ## Getting Started
 

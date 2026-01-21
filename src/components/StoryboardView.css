@@ -619,3 +619,119 @@
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
+
+.panel-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    backdrop-filter: blur(2px);
+}
+
+.panel-loading-overlay span {
+    color: #fff;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.spinner-small {
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-top: 3px solid var(--reveal-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Context Menu */
+.context-menu {
+    position: absolute;
+    background-color: #2d2d2d;
+    border: 1px solid #454545;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    z-index: 5000;
+    min-width: 200px;
+    overflow: hidden;
+    animation: fadeIn 0.1s ease-out;
+}
+
+.context-menu-item {
+    padding: 10px 16px;
+    color: #eee;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.context-menu-item:hover {
+    background-color: var(--reveal-color);
+    color: #fff;
+}
+
+/* Visual Detail Box */
+.panel-text-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.visual-detail-box {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-left: 3px solid var(--reveal-color);
+    /* Visual distinction */
+    padding: 10px;
+    border-radius: 0 6px 6px 0;
+    margin-top: 5px;
+}
+
+.text-label {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+}
+
+.text-label-visual {
+    display: block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: var(--reveal-color);
+    margin-bottom: 4px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.visual-text {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #ccc;
+    line-height: 1.5;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    /* Slightly different font feel if desired */
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

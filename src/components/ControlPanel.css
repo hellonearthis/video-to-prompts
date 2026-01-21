@@ -1,11 +1,21 @@
 .control-panel-container {
     padding: 15px 20px;
-    border-bottom: 1px solid #444;
+    border-top: 1px solid #444;
+    /* Changed from border-bottom to border-top */
+    border-bottom: none;
     display: flex;
     gap: 20px;
     align-items: center;
     flex-wrap: wrap;
     background-color: #2d2d2d;
+    position: fixed;
+    bottom: 60px;
+    /* Above Grid Header (60px) */
+    left: 0;
+    width: 100%;
+    z-index: 910;
+    /* Above Grid Header */
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .control-group {

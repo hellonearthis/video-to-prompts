@@ -189,13 +189,19 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   checkLMStudio: () => ipcRenderer.invoke('ai-init'),
 
   /**
+   * Get list of available prompt types from the config file.
+   */
+  getAvailablePrompts: () => ipcRenderer.invoke('get-available-prompts'),
+
+  /**
    * Analyzes a single frame using LM Studio vision model.
    * 
    * @param imagePath - Absolute path to the image file
+   * @param promptType - Optional prompt type key
    * @returns Promise resolving to analysis result
    */
-  analyzeFrame: (imagePath: string) =>
-    ipcRenderer.invoke('analyze-frame', imagePath),
+  analyzeFrame: (imagePath: string, promptType?: string) =>
+    ipcRenderer.invoke('analyze-frame', imagePath, promptType),
 
   /**
    * Analyzes multiple frames in batch.

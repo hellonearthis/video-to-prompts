@@ -17,6 +17,7 @@ import { ThumbnailGrid, FrameData } from './components/ThumbnailGrid';
 import { StoryboardView, SceneAnalysis } from './components/StoryboardView';
 import { TimelineStrip } from './components/TimelineStrip';
 import { FullStoryboardView } from './components/FullStoryboardView';
+import { NavBar } from './components/NavBar';
 
 /**
  * Video metadata type (matches VideoInfo from backend)
@@ -53,7 +54,7 @@ function App() {
   const [fps, setFps] = useState(3);
 
   /** Scene detection threshold */
-  const [threshold, setThreshold] = useState(0.3);
+  const [sceneDetectionThreshold, setSceneDetectionThreshold] = useState(0.3);
 
   /** Whether to extract frames at time intervals */
   const [doTimeFrames, setDoTimeFrames] = useState(true);
@@ -69,7 +70,7 @@ function App() {
   // --------------------------------------------------------------------------
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDescribing, setIsDescribing] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // --------------------------------------------------------------------------
   // Selection and Analysis State
@@ -81,14 +82,17 @@ function App() {
   /** Current analysis progress */
   const [analysisProgress, setAnalysisProgress] = useState<{ current: number; total: number } | undefined>();
 
-  /** Comparison result */
-  // Removed comparison logic
+  /** Set of hidden frame paths */
+  const [hiddenPaths, setHiddenPaths] = useState<Set<string>>(new Set());
+  /** Whether to show hidden frames */
+  const [showHidden, setShowHidden] = useState(false);
 
-  /** Sequential flow analysis results */
-  // Removed flow results logic
+  /** Whether to show the extraction control panel */
+  const [showExtractionPanel, setShowExtractionPanel] = useState(true);
 
   const [storyboardOpen, setStoryboardOpen] = useState(false);
-  const [fullStoryboardOpen, setFullStoryboardOpen] = useState(false);
+  // fullStoryboardOpen removed
+  const [currentView, setCurrentView] = useState<'frames' | 'storyboard'>('frames');
   const [storyboardFrames, setStoryboardFrames] = useState<string[]>([]);
   const [storyTimeline, setStoryTimeline] = useState<SceneAnalysis[]>([]);
   const [cachedAnalysis, setCachedAnalysis] = useState<SceneAnalysis | null>(null);
@@ -101,6 +105,22 @@ function App() {
 
   const [showExtractionDialog, setShowExtractionDialog] = useState(false);
   const [existingFramesCount, setExistingFramesCount] = useState(0);
+
+  // Prompt Management
+  const [availablePrompts, setAvailablePrompts] = useState<string[]>([]);
+  const [selectedPrompt, setSelectedPrompt] = useState<string>('Default');
+
+  useEffect(() => {
+    // Fetch available prompts
+    window.ipcRenderer.getAvailablePrompts().then((result: any) => {
+      if (result && result.prompts) {
+        setAvailablePrompts(result.prompts);
+        if (result.prompts.length > 0) {
+          setSelectedPrompt(result.prompts[0]);
+        }
+      }
+    }).catch((e: any) => console.warn("Failed to fetch prompts", e));
+  }, []);
 
   // Auto-save timeline when it changes
   useEffect(() => {
@@ -126,6 +146,30 @@ function App() {
         .then(info => setVideoInfo(info))
         .catch(err => console.error('Failed to get video info:', err));
     }
+  }, [filePath]);
+
+  /**
+   * Check for existing extractions when file loads
+   */
+  useEffect(() => {
+    const checkExisting = async () => {
+      if (filePath) {
+        // Reset dialog state first
+        setShowExtractionDialog(false);
+
+        const outputDir = filePath + '_extracted';
+        try {
+          const check = await window.ipcRenderer.checkExtractionExists(outputDir);
+          if (check.exists && check.hasFrames) {
+            setExistingFramesCount(check.count || 0);
+            setShowExtractionDialog(true);
+          }
+        } catch (e) {
+          console.error("Error checking for existing frames:", e);
+        }
+      }
+    };
+    checkExisting();
   }, [filePath]);
 
   /**
@@ -169,9 +213,11 @@ function App() {
     setFrames([]);
     setStoryTimeline([]);
     setStoryboardOpen(false);
-    setFullStoryboardOpen(false);
+    setCurrentView('frames');
     setCachedAnalysis(null);
     setSelectedIndices(new Set());
+    setShowExtractionDialog(false);
+    setShowExtractionPanel(true); // Reset to show panel on new file
   };
 
   const handleModelChange = () => {
@@ -217,29 +263,31 @@ function App() {
 
       if (doTimeFrames) {
         console.log(`Extracting frames at ${fps} fps...`);
-        const paths = await window.ipcRenderer.extractTimeFrames(filePath, outputDir, fps);
-        newFrames.push(...paths.map((p, i) => ({
-          path: p,
+        // Backend now returns { path: string, time: number }[]
+        const timeFrames = await window.ipcRenderer.extractTimeFrames(filePath, outputDir, fps);
+        newFrames.push(...timeFrames.map((tf: { path: string, time: number }, i: number) => ({
+          path: tf.path,
           type: 'time' as const,
           frame: i + 1,
-          time: (i + 1) / fps
+          time: tf.time
         })));
       }
 
       if (doKeyframes) {
         console.log('Extracting Keyframes (I-frames)...');
-        const paths = await window.ipcRenderer.extractKeyframes(filePath, outputDir);
-        newFrames.push(...paths.map((p: string, i: number) => ({
-          path: p,
+        // Backend now returns { path: string, time: number }[]
+        const keyframes = await window.ipcRenderer.extractKeyframes(filePath, outputDir);
+        newFrames.push(...keyframes.map((kf: { path: string, time: number }, i: number) => ({
+          path: kf.path,
           type: 'keyframe' as const,
           frame: i + 1,
-          time: undefined // Keyframes don't have predictable timing
+          time: kf.time
         })));
       }
 
       if (doSceneChanges) {
         console.log('Extracting Scene Changes...');
-        const sceneData = await window.ipcRenderer.extractSceneChanges(filePath, outputDir, threshold);
+        const sceneData = await window.ipcRenderer.extractSceneChanges(filePath, outputDir, sceneDetectionThreshold);
         newFrames.push(...sceneData.map(s => ({
           path: s.path,
           type: 'scene' as const,
@@ -254,7 +302,7 @@ function App() {
       );
 
       setFrames(newFrames);
-
+      setShowExtractionPanel(false); // Hide panel after extraction
     } catch (error) {
       console.error(error);
       alert('Extraction failed: ' + error);
@@ -283,6 +331,7 @@ function App() {
           time: undefined
         }));
         setFrames(loadedFrames);
+        setShowExtractionPanel(false); // Hide panel after loading existing
 
         // Also try to load existing timeline
         const timelineResult = await window.ipcRenderer.loadStoryTimeline(outputDir);
@@ -301,8 +350,28 @@ function App() {
   };
 
   /**
-      // (Optional) Ensure model is loaded - handled by handleModelChange mostly
+   * Analyze only selected frames
+   */
+  const handleAnalyzeSelectedFrames = async () => {
+    // Let's analyze selected, or all if none selected
+    let indicesToAnalyze: number[] = [];
 
+    if (selectedIndices.size > 0) {
+      indicesToAnalyze = Array.from(selectedIndices).sort((a, b) => a - b);
+    } else {
+      // Analyze all
+      indicesToAnalyze = frames.map((_, i) => i);
+    }
+
+    if (indicesToAnalyze.length === 0) {
+      alert("No frames extracted yet.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisProgress({ current: 0, total: indicesToAnalyze.length });
+
+    try {
       // Analyze each frame and update state progressively
       const newFrames = [...frames];
 
@@ -318,7 +387,8 @@ function App() {
         setAnalysisProgress({ current: i + 1, total: indicesToAnalyze.length });
 
         try {
-          const result = await window.ipcRenderer.analyzeFrame(frame.path);
+          // Pass the selected prompt type!
+          const result = await window.ipcRenderer.analyzeFrame(frame.path, selectedPrompt);
 
           if (result.success && result.analysis) {
             newFrames[frameIndex] = {
@@ -357,9 +427,32 @@ function App() {
       console.error('Analysis error:', error);
       alert('Analysis failed: ' + (error instanceof Error ? error.message : error));
     } finally {
-      setIsDescribing(false);
+      setIsAnalyzing(false);
       setAnalysisProgress(undefined);
     }
+  };
+
+  /**
+   * Hide currently selected frames
+   */
+  const handleHideSelected = () => {
+    const newHidden = new Set(hiddenPaths);
+    selectedIndices.forEach(idx => {
+      if (frames[idx]) {
+        newHidden.add(frames[idx].path);
+      }
+    });
+    setHiddenPaths(newHidden);
+    setSelectedIndices(new Set());
+  };
+
+  /**
+   * Unhide a specific frame
+   */
+  const handleUnhide = (path: string) => {
+    const newHidden = new Set(hiddenPaths);
+    newHidden.delete(path);
+    setHiddenPaths(newHidden);
   };
 
   /**
@@ -496,56 +589,32 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+
+
   // ============================================================================
   // Render
   // ============================================================================
 
   return (
     <div className="app-container">
-      {/* Application Header */}
-      <header className="app-header">
-        <div className="header-content">
-          <h1 className="header-title">Video to Prompts</h1>
-          {filePath && (
-            <button
-              onClick={() => {
-                setFilePath(null);
-                setVideoInfo(null);
-                setFrames([]);
-                setStoryTimeline([]);
-                setStoryboardOpen(false);
-                setFullStoryboardOpen(false);
-                setCachedAnalysis(null);
-                setSelectedIndices(new Set());
-              }}
-              className="btn-change-video"
-            >
-              Change Video
-            </button>
-          )}
-        </div>
-      </header>
-
+      {/* Navigation Bar */}
+      <NavBar
+        onChangeVideo={() => {
+          setFilePath(null);
+          setVideoInfo(null);
+          setFrames([]);
+          setStoryTimeline([]);
+          setStoryboardOpen(false);
+          setCachedAnalysis(null);
+          setSelectedIndices(new Set());
+          setCurrentView('frames');
+        }}
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        fileName={filePath?.split(/[/\\]/).pop()}
+        hasTimelineItems={storyTimeline.length > 0}
+      />
       {/* Main Content */}
-      {/* Status Bar */}
-      <div className="status-bar-secondary">
-        <div className="status-bar-info">
-          <span className={`engine-status ${aiStatusMessage.includes('Connected') ? 'connected' : 'disconnected'}`}>
-            Engine: {aiStatusMessage}
-          </span>
-          {analysisProgress && (
-            <span className="analysis-status">
-              Analyzing: {analysisProgress.current} / {analysisProgress.total}
-            </span>
-          )}
-        </div>
-        {filePath && (
-          <div className="file-path-display">
-            {filePath}
-          </div>
-        )}
-      </div>
-
       {!filePath ? (
         <div className="empty-state-container">
           <div className="empty-state-inner">
@@ -554,60 +623,95 @@ function App() {
         </div>
       ) : (
         <>
-          {/* Video Info Bar */}
-          {videoInfo && (
-            <div className="video-info-bar">
-              <span><strong>Duration:</strong> {formatDuration(videoInfo.duration)}</span>
-              <span><strong>FPS:</strong> {videoInfo.fps}</span>
-              <span><strong>Resolution:</strong> {videoInfo.width}×{videoInfo.height}</span>
-              <span><strong>Codec:</strong> {videoInfo.codec}</span>
-              <span><strong>Bitrate:</strong> {videoInfo.bitrate} kb/s</span>
-              <span><strong>Total Frames:</strong> {videoInfo.totalFrames}</span>
-              <span className={`ai-status-indicator ${aiStatusMessage.includes('Connected') ? 'connected' : 'error'}`}>
-                {aiStatusMessage}
-              </span>
-            </div>
+          {/* View: Frames & Analysis */}
+          <div style={{ display: currentView === 'frames' ? 'block' : 'none' }}>
+            {/* Video Info Bar */}
+            {videoInfo && (
+              <div className="video-info-bar">
+                <div className="video-info-left">
+                  <span><strong>Duration:</strong> {formatDuration(videoInfo.duration)}</span>
+                  <span><strong>FPS:</strong> {videoInfo.fps}</span>
+                  <span><strong>Res:</strong> {videoInfo.width}×{videoInfo.height}</span>
+                  <span><strong>Frames:</strong> {videoInfo.totalFrames}</span>
+                </div>
+
+                <div className="video-info-center">
+                  {analysisProgress && (
+                    <span className="analysis-status">
+                      Analyzing: {analysisProgress.current} / {analysisProgress.total}
+                    </span>
+                  )}
+                  <span className={`ai-status-indicator ${aiStatusMessage.includes('Connected') ? 'connected' : 'error'}`}>
+                    {aiStatusMessage}
+                  </span>
+                </div>
+
+                <div className="video-info-right">
+                  {/* Path is now in NavBar */}
+                </div>
+              </div>
+            )}
+
+            {/* Timeline Strip */}
+            <TimelineStrip
+              timeline={storyTimeline}
+              onRemoveScene={handleRemoveFromTimeline}
+              onViewScene={handleViewTimelineScene}
+            />
+
+            {/* Control Panel (Conditionally rendered) */}
+            {showExtractionPanel && (
+              <ControlPanel
+                fps={fps}
+                setFps={setFps}
+                sceneDetectionThreshold={sceneDetectionThreshold}
+                setSceneDetectionThreshold={setSceneDetectionThreshold}
+                extractTimeFrames={doTimeFrames}
+                setExtractTimeFrames={setDoTimeFrames}
+                extractKeyframes={doKeyframes}
+                setExtractKeyframes={setDoKeyframes}
+                extractSceneChanges={doSceneChanges}
+                setExtractSceneChanges={setDoSceneChanges}
+                onRunExtraction={handleRunExtraction}
+                isProcessing={isProcessing}
+                selectedModel="LM Studio (Local API)"
+                onModelChange={handleModelChange}
+                availablePrompts={availablePrompts}
+                selectedPrompt={selectedPrompt}
+                onPromptChange={setSelectedPrompt}
+              />
+            )}
+
+            {/* ThumbnailGrid */}
+            <ThumbnailGrid
+              frames={frames}
+              selectedIndices={selectedIndices}
+              onSelectionChange={setSelectedIndices}
+              onAnalyzeStory={handleAnalyzeStory}
+              onAnalyzeFrames={handleAnalyzeSelectedFrames}
+              isAnalyzing={isAnalyzing}
+              analysisProgress={analysisProgress}
+              hasAnalyzedFrames={frames.some(f => f.isAnalyzed)}
+              hiddenPaths={hiddenPaths}
+              showHidden={showHidden}
+              onUnhide={handleUnhide}
+              showExtractionPanel={showExtractionPanel}
+              onToggleExtractionPanel={() => setShowExtractionPanel(prev => !prev)}
+              onHideSelected={handleHideSelected}
+              onToggleShowHidden={() => setShowHidden(!showHidden)}
+            />
+          </div>
+
+          {/* View: Full Storyboard */}
+          {currentView === 'storyboard' && (
+            <FullStoryboardView
+              isOpen={true}
+              onClose={() => setCurrentView('frames')}
+              timeline={storyTimeline}
+            />
           )}
 
-          {/* Timeline Strip */}
-          <TimelineStrip
-            timeline={storyTimeline}
-            onRemoveScene={handleRemoveFromTimeline}
-            onViewScene={handleViewTimelineScene}
-            onViewFullStoryboard={() => setFullStoryboardOpen(true)}
-          />
-
-          {/* Control Panel */}
-          <ControlPanel
-            fps={fps}
-            setFps={setFps}
-            threshold={threshold}
-            setThreshold={setThreshold}
-            extractTimeFrames={doTimeFrames}
-            setExtractTimeFrames={setDoTimeFrames}
-            extractKeyframes={doKeyframes}
-            setExtractKeyframes={setDoKeyframes}
-            extractSceneChanges={doSceneChanges}
-            setExtractSceneChanges={setDoSceneChanges}
-            onRunExtraction={handleRunExtraction}
-            isProcessing={isProcessing}
-            selectedModel="LM Studio (Local API)"
-            onModelChange={handleModelChange}
-            framesCount={frames.length}
-          />
-
-          {/* Thumbnail Grid - flexible height, scrolls with page */}
-          <ThumbnailGrid
-            frames={frames}
-            selectedIndices={selectedIndices}
-            onSelectionChange={setSelectedIndices}
-            onAnalyzeStory={handleAnalyzeStory}
-            isDescribing={isDescribing}
-            analysisProgress={analysisProgress}
-            hasAnalyzedFrames={frames.some(f => f.isAnalyzed)}
-          />
-
-          {/* Storyboard View */}
+          {/* Storyboard Modal (Scene Editor) */}
           <StoryboardView
             isOpen={storyboardOpen}
             onClose={() => setStoryboardOpen(false)}
@@ -618,32 +722,10 @@ function App() {
             onAnalysisComplete={handleAnalysisComplete}
             timeline={storyTimeline}
           />
-
-          {/* Full Storyboard View */}
-          <FullStoryboardView
-            isOpen={fullStoryboardOpen}
-            onClose={() => setFullStoryboardOpen(false)}
-            timeline={storyTimeline}
-          />
         </>
       )}
 
-      {/* Status Bar */}
-      <footer className="app-footer">
-        <div className="footer-info">
-          <span><strong>AI Engine:</strong> LM Studio</span>
-          {isDescribing ? (
-            <span><strong>Status:</strong> Analyzing Frames...</span>
-          ) : isProcessing ? (
-            <span><strong>Status:</strong> Extracting Frames...</span>
-          ) : (
-            <span><strong>Status:</strong> {aiStatusMessage}</span>
-          )}
-        </div>
-        <div className="footer-version">
-          v1.0.0
-        </div>
-      </footer>
+
 
       {/* Extraction Choice Dialog */}
       {showExtractionDialog && (

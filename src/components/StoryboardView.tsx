@@ -40,6 +40,7 @@ export interface SceneAnalysis {
             panel_index: number;
             role: string;
             description: string;
+            visual_detail?: string; // New field for ultra-detailed visual description
             best_frame_index: number;
         }>;
     };
@@ -53,10 +54,21 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
 }) => {
     const [analysis, setAnalysis] = useState<SceneAnalysis | null>(null);
     const [loading, setLoading] = useState(false);
+    const [loadingPanels, setLoadingPanels] = useState<Set<number>>(new Set());
     const [elapsedTime, setElapsedTime] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [editingPanelIndex, setEditingPanelIndex] = useState<number | null>(null);
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; panelIndex: number } | null>(null);
+
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        const handleClickOutside = () => setContextMenu(null);
+        window.addEventListener('click', handleClickOutside);
+        return () => window.removeEventListener('click', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         if (isOpen) {
@@ -103,13 +115,59 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
 
         try {
             console.log("Starting analysis for frames:", framePaths);
+            // 1. First Pass: Narrative Analysis (Structure & Panels)
             const result = await window.ipcRenderer.analyzeStorySequence(framePaths);
+
             if (result.success && result.analysis) {
-                const enrichedAnalysis: SceneAnalysis = {
+                let enrichedAnalysis: SceneAnalysis = {
                     ...result.analysis,
                     frames: framePaths,
                     timestamp: new Date().toISOString()
                 };
+
+                // 2. Second Pass: Ultra Cinematic Detail for each panel
+                // This updates the loading status implicitly by the fact we act on it before setting final state
+                // Ideally we'd show a specific sub-status, but sticking to simple state for now
+                console.log("Starting secondary visual pass...");
+
+                const updatedPanels = [...enrichedAnalysis.panel_guidance.panels];
+
+                for (let i = 0; i < updatedPanels.length; i++) {
+                    // We could update loadingPanels here to show progress on cards
+                    setLoadingPanels(prev => new Set(prev).add(i));
+
+                    const panel = updatedPanels[i];
+                    const framePath = framePaths[panel.best_frame_index];
+
+                    if (framePath) {
+                        try {
+                            const visualResult = await window.ipcRenderer.analyzeFrame(framePath, "Ultra Cinematic Detailed");
+
+                            if (visualResult.success && visualResult.analysis && visualResult.analysis.summary) {
+                                // Set the visual_detail field directly
+                                updatedPanels[i] = {
+                                    ...panel,
+                                    visual_detail: visualResult.analysis.summary
+                                };
+                            }
+                        } catch (e) {
+                            console.warn(`Secondary analysis failed for panel ${i}`, e);
+                        }
+                    }
+                    // Clear loading for this panel
+                    setLoadingPanels(prev => {
+                        const next = new Set(prev);
+                        next.delete(i);
+                        return next;
+                    });
+
+                    // Helper to update intermediate state if we wanted "live" updates,
+                    // but React state batching might make this tricky in a loop without flushSync.
+                    // We'll stick to setting final state at the end for the big batch to prevent flickering.
+                }
+
+                enrichedAnalysis.panel_guidance.panels = updatedPanels;
+
                 setAnalysis(enrichedAnalysis);
                 onAnalysisComplete?.(enrichedAnalysis);
             } else {
@@ -123,6 +181,59 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                 timerRef.current = null;
             }
             setLoading(false);
+            setLoadingPanels(new Set()); // Ensure all cleared
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, panelIndex: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            x: e.pageX,
+            y: e.pageY,
+            panelIndex
+        });
+    };
+
+    /**
+     * Re-analyzes specific panel (used for right-click interaction)
+     */
+    const handleAnalyzePanel = async (panelIndex: number) => {
+        setContextMenu(null); // Close menu
+        if (loadingPanels.has(panelIndex) || !analysis) return;
+
+        setLoadingPanels(prev => new Set(prev).add(panelIndex));
+
+        try {
+            const panel = analysis.panel_guidance.panels[panelIndex];
+            const framePath = framePaths[panel.best_frame_index];
+
+            console.log(`Re-analyzing panel ${panelIndex} with frame ${framePath}`);
+
+            const visualResult = await window.ipcRenderer.analyzeFrame(framePath, "Ultra Cinematic Detailed");
+
+            if (visualResult.success && visualResult.analysis?.summary) {
+                const newAnalysis = { ...analysis };
+                const panels = [...newAnalysis.panel_guidance.panels];
+
+                panels[panelIndex] = {
+                    ...panel,
+                    visual_detail: visualResult.analysis.summary
+                };
+
+                newAnalysis.panel_guidance.panels = panels;
+                setAnalysis(newAnalysis);
+                onAnalysisComplete?.(newAnalysis);
+            }
+        } catch (error) {
+            console.error("Panel analysis failed:", error);
+            // Could show a toast/notification here
+        } finally {
+            setLoadingPanels(prev => {
+                const next = new Set(prev);
+                next.delete(panelIndex);
+                return next;
+            });
         }
     };
 
@@ -200,8 +311,8 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                 <div className="loading-timer">{elapsedTime}s</div>
                             </div>
                             <div className="loading-text-container">
-                                <p className="loading-status">Analyzing Narrative Beats...</p>
-                                <p className="loading-subtext">Processing {framePaths.length} frames with AI</p>
+                                <p className="loading-status">Analyzing Narrative & Visuals...</p>
+                                <p className="loading-subtext">Processing {framePaths.length} frames (Dual Phase)</p>
                             </div>
                         </div>
                     )}
@@ -277,12 +388,22 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                             <div key={idx} className="panel-card">
                                                 <div
                                                     onClick={() => setEditingPanelIndex(idx)}
+                                                    onContextMenu={(e) => handleContextMenu(e, idx)}
                                                     className={`panel-image-container ${roleClass} ${isReveal ? 'role-reveal' : ''}`}
+                                                    title="Click to Swap | Right-Click for Options"
                                                 >
                                                     <img
                                                         src={`file:///${framePath.replace(/\\/g, '/')}`}
                                                         className="panel-image"
                                                     />
+
+                                                    {loadingPanels.has(idx) && (
+                                                        <div className="panel-loading-overlay">
+                                                            <div className="spinner-small" />
+                                                            <span>Updating...</span>
+                                                        </div>
+                                                    )}
+
                                                     <div className={`panel-badge ${isReveal ? 'reveal' : ''}`}>
                                                         {isReveal ? '🌟 REVEAL' : `Panel ${panel.panel_index + 1}`}
                                                         {!isReveal && <span className="role-label">| {panel.role}</span>}
@@ -295,11 +416,22 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                                     )}
 
                                                     <div className="swap-label">
-                                                        Click to swap frame
+                                                        Swap / Option
                                                     </div>
                                                 </div>
-                                                <div className="panel-description">
-                                                    {panel.description}
+
+                                                <div className="panel-text-content">
+                                                    <div className="panel-description">
+                                                        <span className="text-label">Narrative Action:</span>
+                                                        {panel.description}
+                                                    </div>
+
+                                                    {panel.visual_detail && (
+                                                        <div className="visual-detail-box">
+                                                            <span className="text-label-visual">👁️ Visual Detail:</span>
+                                                            <p className="visual-text">{panel.visual_detail}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -354,6 +486,22 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
                                     )}
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Context Menu */}
+                {contextMenu && (
+                    <div
+                        className="context-menu"
+                        style={{ top: contextMenu.y, left: contextMenu.x }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="context-menu-item" onClick={() => handleAnalyzePanel(contextMenu.panelIndex)}>
+                            👁️ Re-analyze Visuals (Ultra Detail)
+                        </div>
+                        <div className="context-menu-item" onClick={() => { setEditingPanelIndex(contextMenu.panelIndex); setContextMenu(null); }}>
+                            🖼️ Swap Frame
                         </div>
                     </div>
                 )}
