@@ -131,7 +131,7 @@ export const extractTimeFrames = async ({ filePath, outputDir, fps = 1 }: Extrac
         const outputPattern = path.join(outputDir, 'time_%04d.png');
         const args = [
             '-i', filePath,
-            '-vf', `fps=${fps},scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease`,
+            '-vf', `fps=${fps},scale='if(gt(iw,ih),640,360)':'if(gt(iw,ih),360,640)':force_original_aspect_ratio=decrease`,
             '-an',
             '-f', 'image2',
             outputPattern
@@ -207,7 +207,7 @@ export const extractSceneChanges = async ({ filePath, outputDir, threshold = 0.3
         // -vsync vfr: Variable frame rate (only output selected frames)
         const args = [
             '-i', filePath,
-            '-vf', `select='gt(scene,${threshold})',scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease,showinfo`,
+            '-vf', `select='gt(scene,${threshold})',scale='if(gt(iw,ih),640,360)':'if(gt(iw,ih),360,640)':force_original_aspect_ratio=decrease,showinfo`,
             '-vsync', 'vfr',
             '-an',
             outputPattern
@@ -377,7 +377,7 @@ export const extractKeyframes = async ({ filePath, outputDir }: ExtractionOption
         // We use select='eq(pict_type,I)' instead of skip_frame to ensure showinfo sees and reports the frames we keep.
         const args = [
             '-i', filePath,
-            '-vf', `select='eq(pict_type,I)',scale='if(gt(iw,ih),640,420)':'if(gt(iw,ih),420,640)':force_original_aspect_ratio=decrease,showinfo`,
+            '-vf', `select='eq(pict_type,I)',scale='if(gt(iw,ih),640,360)':'if(gt(iw,ih),360,640)':force_original_aspect_ratio=decrease,showinfo`,
             '-vsync', 'vfr', // Variable frame rate to output only selected frames
             '-an',
             outputPattern
@@ -427,5 +427,36 @@ export const extractKeyframes = async ({ filePath, outputDir }: ExtractionOption
             console.error('FFmpeg process error:', err);
             reject(err);
         });
+    });
+};
+
+/**
+ * Extracts a single high-resolution frame at a specific timestamp.
+ */
+export const extractSingleHighResFrame = async (filePath: string, timestamp: number, outputDir: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        if (!fs.existsSync(outputDir)) { fs.mkdirSync(outputDir, { recursive: true }); }
+
+        const timestampStr = timestamp.toFixed(3).replace('.', '-');
+        const outputPath = path.join(outputDir, `hq_${timestampStr}.png`);
+
+        const args = [
+            '-ss', timestamp.toString(),
+            '-i', filePath,
+            '-frames:v', '1',
+            '-q:v', '2',
+            '-y',
+            outputPath
+        ];
+
+        console.log('Running HQ extraction:', args.join(' '));
+        const proc = spawn(getFfmpegPath(), args);
+
+        proc.on('close', (code) => {
+            if (code === 0) resolve(outputPath);
+            else reject(new Error(`HQ extraction failed with code ${code}`));
+        });
+
+        proc.on('error', reject);
     });
 };

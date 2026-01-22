@@ -47,6 +47,13 @@ interface ThumbnailGridProps {
     onToggleExtractionPanel: () => void;
     onHideSelected: () => void;
     onToggleShowHidden: () => void;
+
+    // AI controls
+    availablePrompts: string[];
+    selectedPrompt: string;
+    onPromptChange: (val: string) => void;
+    selectedModel: string;
+    onModelChange: () => void;
 }
 
 // ============================================================================
@@ -67,7 +74,12 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
     showExtractionPanel,
     onToggleExtractionPanel,
     onHideSelected,
-    onToggleShowHidden
+    onToggleShowHidden,
+    availablePrompts,
+    selectedPrompt,
+    onPromptChange,
+    selectedModel,
+    onModelChange
 }) => {
 
     // Handle frame click for selection
@@ -127,6 +139,33 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                     <span>Selected: {selectedIndices.size}</span>
                     <span className="stats-separator">|</span>
                     <span className="stats-analyzed">Analyzed: {analyzedCount}</span>
+                </div>
+
+                <div className="header-ai-controls">
+                    <div className="ai-control-item">
+                        <label>Prompt:</label>
+                        <select
+                            value={selectedPrompt}
+                            onChange={(e) => onPromptChange(e.target.value)}
+                            className="header-select"
+                            disabled={isAnalyzing}
+                        >
+                            {availablePrompts.length === 0 && <option value="Default">Default</option>}
+                            {Array.isArray(availablePrompts) && availablePrompts.map(p => (
+                                <option key={p} value={p}>{p}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="ai-control-item">
+                        <label>AI:</label>
+                        <button
+                            onClick={onModelChange}
+                            disabled={isAnalyzing}
+                            className="btn-header-model"
+                        >
+                            {selectedModel}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="header-actions">
@@ -268,11 +307,8 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                             {/* Metadata */}
                             <div className="frame-meta-content">
                                 <div className="meta-header-row">
-                                    <span className={`frame-type-badge type-${frame.type}`}>
-                                        {frame.type}
-                                    </span>
                                     <span className="frame-timestamp">
-                                        {frame.time !== undefined ? `${frame.time.toFixed(2)}s` : ''}
+                                        Frame {index + 1} {frame.time !== undefined ? `- ${frame.time.toFixed(2)}s` : ''}
                                     </span>
                                 </div>
 
@@ -281,8 +317,23 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                                     <div className="ai-analysis-results">
                                         {/* Summary */}
                                         {frame.description && (
-                                            <div className="analysis-description">
-                                                {frame.description}
+                                            <div className="analysis-description-container">
+                                                <div className="description-header">
+                                                    <span className="description-label">Description</span>
+                                                    <button
+                                                        className="btn-copy-description"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigator.clipboard.writeText(frame.description || '');
+                                                        }}
+                                                        title="Copy explanation to clipboard"
+                                                    >
+                                                        📋 Copy
+                                                    </button>
+                                                </div>
+                                                <div className="analysis-description">
+                                                    {frame.description}
+                                                </div>
                                             </div>
                                         )}
 

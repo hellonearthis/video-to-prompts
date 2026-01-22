@@ -26,25 +26,28 @@ export const NavBar: React.FC<NavBarProps> = ({
                     Change Video
                 </button>
                 {fileName && <span className="nav-filename">{fileName}</span>}
+                {currentView === 'storyboard' && (
+                    <button
+                        onClick={() => onViewChange('frames')}
+                        className="nav-btn back-btn"
+                        style={{ marginLeft: '10px', color: '#007AFF', border: '1px solid #007AFF' }}
+                    >
+                        ← Back to Frames
+                    </button>
+                )}
             </div>
 
             <div className="navbar-center">
-                <div className="nav-group">
-                    <button
-                        className={`nav-tab ${currentView === 'frames' ? 'active' : ''}`}
-                        onClick={() => onViewChange('frames')}
-                    >
-                        Frames & Analysis
-                    </button>
-                    {hasTimelineItems && (
+                {hasTimelineItems && (
+                    <div className="nav-group">
                         <button
                             className={`nav-tab nav-tab-storyboard ${currentView === 'storyboard' ? 'active' : ''}`}
                             onClick={() => onViewChange('storyboard')}
                         >
                             Full Storyboard
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
             <div className="navbar-right">

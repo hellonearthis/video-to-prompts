@@ -101,11 +101,13 @@ interface Window {
         listFrames: (outputDir: string) => Promise<{ success: boolean; frames: string[]; error?: string }>;
         saveStoryTimeline: (outputDir: string, timelineData: any) => Promise<{ success: boolean; path?: string; error?: string }>;
         loadStoryTimeline: (outputDir: string) => Promise<{ success: boolean; timeline?: any; error?: string }>;
+        saveFramesData: (outputDir: string, data: any[]) => Promise<{ success: boolean; error?: string }>;
+        loadFramesData: (outputDir: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
         checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
         getAvailablePrompts: () => Promise<{ prompts: string[] }>;
         initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;
-        analyzeFrame: (imagePath: string, promptType?: string) => Promise<AnalysisResult>;
-        analyzeFramesBatch: (paths: string[], promptType?: string) => Promise<any>;
+        analyzeFrame: (imagePath: string, promptType?: string, videoPath?: string, timestamp?: number) => Promise<AnalysisResult>;
+        analyzeFramesBatch: (batchData: { path: string, videoPath?: string, time?: number }[], promptType?: string) => Promise<any>;
         compareFrames: (f1: string, f2: string) => Promise<any>;
         compareSequential: (paths: string[]) => Promise<{ success: boolean; results?: any[]; error?: string }>;
         analyzeStorySequence: (paths: string[]) => Promise<{ success: boolean; analysis?: any; error?: string }>;
@@ -114,6 +116,8 @@ interface Window {
         exportAnalysisJson: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
         exportComparisonJson: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
         exportFlowReport: (outputDir: string, data: object) => Promise<{ success: boolean; path?: string; error?: string }>;
+        getRecentProjects: () => Promise<{ success: boolean; projects: any[]; error?: string }>;
+        saveRecentProject: (projectData: { path: string; name: string }) => Promise<{ success: boolean; error?: string }>;
         on: (channel: string, listener: (event: any, ...args: any[]) => void) => () => void;
         off: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
     }

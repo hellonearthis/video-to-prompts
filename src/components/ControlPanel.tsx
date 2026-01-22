@@ -39,17 +39,6 @@ interface ControlPanelProps {
 
     /** Whether extraction is currently in progress */
     isProcessing: boolean;
-
-    selectedModel: string;
-    /** Callback to update selected model */
-    onModelChange: () => void;
-
-    /** List of available prompts */
-    availablePrompts: string[];
-    /** Currently selected prompt */
-    selectedPrompt: string;
-    /** Callback to change prompt */
-    onPromptChange: (val: string) => void;
 }
 
 // ============================================================================
@@ -68,12 +57,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     extractSceneChanges,
     setExtractSceneChanges,
     onRunExtraction,
-    isProcessing,
-    selectedModel,
-    onModelChange,
-    availablePrompts,
-    selectedPrompt,
-    onPromptChange
+    isProcessing
 }) => {
     return (
         <div className="control-panel-container">
@@ -149,35 +133,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     />
                     Scene Changes
                 </label>
-            </div>
-
-            {/* --------------------------------------------------------------------------
-              AI Model / API Status
-              -------------------------------------------------------------------------- */}
-            <div className="control-group">
-                <label className="control-label">Analysis Prompt</label>
-                <select
-                    value={selectedPrompt}
-                    onChange={(e) => onPromptChange(e.target.value)}
-                    className="control-select"
-                    disabled={isProcessing}
-                >
-                    {availablePrompts.length === 0 && <option value="Default">Default</option>}
-                    {availablePrompts.map(p => (
-                        <option key={p} value={p}>{p}</option>
-                    ))}
-                </select>
-            </div>
-
-            <div className="control-group">
-                <label className="control-label">AI Engine</label>
-                <button
-                    onClick={onModelChange}
-                    disabled={isProcessing}
-                    className="btn-model-refresh"
-                >
-                    {selectedModel} (Refresh)
-                </button>
             </div>
 
             {/* --------------------------------------------------------------------------

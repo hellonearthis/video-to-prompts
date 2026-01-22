@@ -12,6 +12,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { app } from 'electron';
 
 // ============================================================================
 // Configuration
@@ -94,42 +95,84 @@ export interface FrameComparisonResult {
 // Prompt Management
 // ============================================================================
 
+const DEFAULT_PROMPTS = {
+    "_preset_prompts": [
+        "Tags",
+        "Simple Description",
+        "Detailed Description",
+        "Ultra Detailed Description",
+        "Cinematic Description",
+        "Detailed Analysis",
+        "Video Summary",
+        "Short Story",
+        "Prompt Refine & Expand",
+        "Ultra Cinematic Detailed"
+    ],
+    "qwenvl": {
+        "Tags": "Your task is to generate a clean list of comma-separated tags for a text-to-image AI, based *only* on the visual information in the image. Limit the output to a maximum of 50 unique tags. Strictly describe visual elements like subject, clothing, environment, colors, lighting, and composition. Do not include abstract concepts, interpretations, marketing terms, or technical jargon (e.g., no 'SEO', 'brand-aligned', 'viral potential'). The goal is a concise list of visual descriptors. Avoid repeating tags.",
+        "Simple Description": "Analyze the image and write a single concise sentence that describes the main subject and setting. Keep it grounded in visible details only.",
+        "Detailed Description": "Write ONE detailed paragraph (6 to 10 sentences). Describe only what is visible: subject(s) and actions; people details if present (approx age group, gender expression if clear, hair, facial expression, pose, clothing, accessories); environment (location type, background elements, time cues); lighting (source, direction, softness/hardness, color temperature, shadows); camera viewpoint (eye-level/low/high, distance) and composition (framing, focal emphasis). No preface, no reasoning, no <think>.",
+        "Ultra Detailed Description": "Write ONE ultra-detailed paragraph (10 to 16 sentences, or 180 to 320 words). Stay grounded in visible details. Include: subject micro-details (materials, textures, patterns, wear, reflections); people details if present (hair, skin tones, makeup, jewelry, fabric types, fit); environment depth (foreground/midground/background, signage/props, surface materials); lighting analysis (key/fill/back light, direction, softness, highlights, shadow shape); camera perspective (angle, lens feel, depth of field) and composition (leading lines, negative space, symmetry/asymmetry, visual hierarchy). No preface, no reasoning, no <think>.",
+        "Cinematic Description": "Write ONE cinematic paragraph (8 to 12 sentences). Describe the scene like a film still: subject(s) and action; environment and atmosphere; lighting design (practical lights vs ambient, direction, contrast); camera language (shot type, angle, lens feel, depth of field, motion implied); composition and mood. Keep it vivid but factual (no made-up story). No preface, no reasoning, no <think>.",
+        "Detailed Analysis": "Output ONLY these sections with short labels (no bullets): Subject; People (if any); Environment; Lighting; Camera/Composition; Color/Texture. In each section, write 2 to 4 sentences of concrete visible details. If something is not visible, write 'not visible'. No preface, no reasoning, no <think>.",
+        "Video Summary": "Summarize the key events and narrative points in this video.",
+        "Short Story": "Write a short, imaginative story inspired by this image or video.",
+        "Prompt Refine & Expand": "Refine and enhance the following user prompt for creative text-to-image generation. Keep the meaning and keywords, make it more expressive and visually rich. Output ONLY the improved prompt text (no preface, no bullets, no JSON, no <think>, no commentary).",
+        "Ultra Cinematic Detailed": "Analyze this image with EXTREME focus on visual micro-details. Describe every texture (fabric weave, skin pores, surface weathering), lighting nuance (exact color temperature, shadow fall-off, practical sources), and material quality (reflectivity, roughness). Break down the composition, depth of field, and camera lens characteristics. Output ONE dense, highly descriptive paragraph suitable for high-end generative reproduction. No narrative fluff, just pure visual data."
+    }
+};
+
 let PROMPTS_CACHE: any = null;
+let LAST_SEARCH_LOGS: string[] = [];
 
 const loadPrompts = () => {
     if (PROMPTS_CACHE) return PROMPTS_CACHE;
     try {
-        // Try to locate the prompts file relative to the app execution
-        // In dev, it might be in root. In prod, slightly different.
-        // We'll try a few paths
         const searchPaths = [
+            path.join(app.getAppPath(), 'qwen_vl3_prompts.json'),
+            path.join(app.getAppPath(), '..', 'qwen_vl3_prompts.json'),
             path.join(process.cwd(), 'qwen_vl3_prompts.json'),
+            path.join(__dirname, 'qwen_vl3_prompts.json'),
+            path.join(__dirname, '../qwen_vl3_prompts.json'),
             path.join(__dirname, '../../qwen_vl3_prompts.json'),
-            path.join(__dirname, '../../../qwen_vl3_prompts.json')
+            path.join(__dirname, '../../../qwen_vl3_prompts.json'),
+            // Fallback for packaged app
+            path.join(process.cwd(), 'resources', 'qwen_vl3_prompts.json')
         ];
 
+        LAST_SEARCH_LOGS.push(`Searching for prompts file... (CWD: ${process.cwd()}, __dirname: ${__dirname})`);
+
         for (const p of searchPaths) {
+            LAST_SEARCH_LOGS.push(`Checking path: ${p}`);
             if (fs.existsSync(p)) {
-                console.log(`[LM-STUDIO] Loading prompts from ${p}`);
+                LAST_SEARCH_LOGS.push(`Found prompts file at: ${p}`);
                 const data = fs.readFileSync(p, 'utf-8');
-                PROMPTS_CACHE = JSON.parse(data);
-                return PROMPTS_CACHE;
+                try {
+                    PROMPTS_CACHE = JSON.parse(data);
+                    LAST_SEARCH_LOGS.push(`Successfully parsed ${PROMPTS_CACHE._preset_prompts?.length || 0} prompts`);
+                    return PROMPTS_CACHE;
+                } catch (jsonErr) {
+                    LAST_SEARCH_LOGS.push(`JSON Parse Error for ${p}: ${String(jsonErr)}`);
+                    throw jsonErr;
+                }
             }
         }
-        console.warn('[LM-STUDIO] Prompts file not found, using defaults');
+        LAST_SEARCH_LOGS.push('Prompts file not found in any search path');
         return null;
     } catch (e) {
-        console.error('[LM-STUDIO] Failed to load prompts:', e);
+        LAST_SEARCH_LOGS.push(`Failed to load prompts: ${String(e)}`);
         return null;
     }
 };
 
-export const getAvailablePrompts = (): string[] => {
+export const getAvailablePrompts = (): { prompts: string[], logs: string[] } => {
+    LAST_SEARCH_LOGS = [];
     const data = loadPrompts();
     if (data && data._preset_prompts) {
-        return data._preset_prompts;
+        return { prompts: data._preset_prompts, logs: LAST_SEARCH_LOGS };
     }
-    return ["Default"];
+    // Return default prompts if file load failed
+    return { prompts: DEFAULT_PROMPTS._preset_prompts, logs: LAST_SEARCH_LOGS };
 };
 
 /**
@@ -155,7 +198,8 @@ export const analyzeFrame = async (imagePath: string, promptType?: string): Prom
         console.log(`[LM-STUDIO] Image size: ${imageBuffer.length} bytes, type: ${mimeType}`);
 
         // Load prompts
-        const prompts = loadPrompts();
+        let prompts = loadPrompts();
+        if (!prompts) prompts = DEFAULT_PROMPTS;
         let promptText = "";
 
         // Determine prompt to use
@@ -183,21 +227,25 @@ export const analyzeFrame = async (imagePath: string, promptType?: string): Prom
             // So we will construct a prompt that asks the model to output JSON where the specific field is populated by the prompt's result.
             // Actually, simpler: Let's ask for JSON, but tell the model to use the "User Prompt" logic to fill the "summary".
 
-            const basePrompt = `Analyze this image.
-Task: ${promptText}
+            const basePrompt = `Analyze the provided image based on this specific task:
+### Task
+${promptText}
 
-Return a JSON object with this structure:
+### Output Requirement
+Return ONLY a valid JSON object. Do not include any conversational filler, preface, or markdown code blocks. 
+
+Structure:
 {
-    "summary": "The result of the specific task (description, story, etc)",
-    "objects": ["list", "of", "visible", "objects" (only if relevant, else empty)],
-    "tags": ["list", "of", "tags" (only if relevant, else empty)],
-    "scene_type": "scene type",
+    "summary": "MANDATORY: Populate this field with the full result of the Task specified above. Do not truncate or summarize.",
+    "objects": ["primary object", "secondary object", ...],
+    "tags": ["visual tag 1", "visual tag 2", ...],
+    "scene_type": "cinematic/portrait/wide/etc",
     "visual_elements": {
-        "dominant_colors": [],
-        "lighting": ""
+        "dominant_colors": ["#hex1", "#hex2"],
+        "lighting": "concise lighting summary"
     }
 }
-Do not include markdown formatting.`;
+Final JSON object:`;
 
             promptText = basePrompt;
 
@@ -240,7 +288,8 @@ Do not include markdown formatting or explanations.`;
                         ]
                     }
                 ],
-                temperature: 0.7
+                temperature: 0.7,
+                max_tokens: 4096
             })
         });
 

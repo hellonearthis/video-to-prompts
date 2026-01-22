@@ -110,10 +110,26 @@ function App() {
   const [availablePrompts, setAvailablePrompts] = useState<string[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<string>('Default');
 
+  /** Recent projects from history.json */
+  const [recentProjects, setRecentProjects] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Fetch recent projects history
+    const loadHistory = async () => {
+      const result = await window.ipcRenderer.getRecentProjects();
+      if (result.success) {
+        setRecentProjects(result.projects);
+      }
+    };
+    loadHistory();
+  }, [filePath]); // Refresh when going back to home or selecting new
+
   useEffect(() => {
     // Fetch available prompts
     window.ipcRenderer.getAvailablePrompts().then((result: any) => {
+      console.log('[PROMPTS] Backend Search Diagnostics:', result.logs);
       if (result && result.prompts) {
+        console.log('[PROMPTS] Available prompts:', result.prompts);
         setAvailablePrompts(result.prompts);
         if (result.prompts.length > 0) {
           setSelectedPrompt(result.prompts[0]);
@@ -162,7 +178,8 @@ function App() {
           const check = await window.ipcRenderer.checkExtractionExists(outputDir);
           if (check.exists && check.hasFrames) {
             setExistingFramesCount(check.count || 0);
-            setShowExtractionDialog(true);
+            // Automatically reuse existing frames instead of showing dialog
+            handleUseExistingFrames();
           }
         } catch (e) {
           console.error("Error checking for existing frames:", e);
@@ -218,6 +235,10 @@ function App() {
     setSelectedIndices(new Set());
     setShowExtractionDialog(false);
     setShowExtractionPanel(true); // Reset to show panel on new file
+
+    // Save to history
+    const name = path.split(/[/\\]/).pop() || 'Unknown Video';
+    window.ipcRenderer.saveRecentProject({ path, name });
   };
 
   const handleModelChange = () => {
@@ -248,7 +269,7 @@ function App() {
       const check = await window.ipcRenderer.checkExtractionExists(outputDir);
       if (check.exists && check.hasFrames) {
         setExistingFramesCount(check.count || 0);
-        setShowExtractionDialog(true);
+        handleUseExistingFrames();
         return;
       }
     }
@@ -330,7 +351,23 @@ function App() {
           frame: i + 1,
           time: undefined
         }));
-        setFrames(loadedFrames);
+        // Load existing analysis data if present
+        const savedDataResult = await window.ipcRenderer.loadFramesData(outputDir);
+        if (savedDataResult.success && savedDataResult.data) {
+          // Merge saved analysis into loaded frames
+          const savedData = savedDataResult.data;
+          const mergedFrames = loadedFrames.map(lf => {
+            const match = savedData.find((sd: any) => sd.path === lf.path);
+            if (match) {
+              return { ...lf, ...match };
+            }
+            return lf;
+          });
+          setFrames(mergedFrames);
+        } else {
+          setFrames(loadedFrames);
+        }
+
         setShowExtractionPanel(false); // Hide panel after loading existing
 
         // Also try to load existing timeline
@@ -387,8 +424,14 @@ function App() {
         setAnalysisProgress({ current: i + 1, total: indicesToAnalyze.length });
 
         try {
-          // Pass the selected prompt type!
-          const result = await window.ipcRenderer.analyzeFrame(frame.path, selectedPrompt);
+          // Hardcoded to "Ultra Detailed Description" as requested
+          // Passing filePath and frame.time triggers high-res extraction in the main process
+          const result = await window.ipcRenderer.analyzeFrame(
+            frame.path,
+            selectedPrompt, // Use the UI-selected prompt instead of hardcoded string
+            filePath || undefined,
+            frame.time
+          );
 
           if (result.success && result.analysis) {
             newFrames[frameIndex] = {
@@ -409,8 +452,13 @@ function App() {
             };
           }
 
-          // Update state after each frame to show progress
           setFrames([...newFrames]);
+
+          // Persist each step for safety
+          if (filePath) {
+            const outputDir = filePath + '_extracted';
+            window.ipcRenderer.saveFramesData(outputDir, newFrames).catch(e => console.error('Save failed:', e));
+          }
 
         } catch (error) {
           console.error(`Error analyzing frame ${frameIndex}:`, error);
@@ -618,7 +666,33 @@ function App() {
       {!filePath ? (
         <div className="empty-state-container">
           <div className="empty-state-inner">
+            <h1 className="main-title">Video to Prompts</h1>
             <FilePicker onFileSelected={handleFileSelect} />
+
+            {recentProjects.length > 0 && (
+              <div className="history-section">
+                <h2 className="history-title">Recent Videos</h2>
+                <div className="history-list">
+                  {recentProjects.map((project, idx) => (
+                    <div
+                      key={idx}
+                      className="history-item"
+                      onClick={() => handleFileSelect(project.path)}
+                    >
+                      <div className="history-item-info">
+                        <span className="history-item-name">{project.name}</span>
+                        <span className="history-item-date">
+                          {new Date(project.lastAccessed).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="history-item-path" title={project.path}>
+                        {project.path}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -674,11 +748,6 @@ function App() {
                 setExtractSceneChanges={setDoSceneChanges}
                 onRunExtraction={handleRunExtraction}
                 isProcessing={isProcessing}
-                selectedModel="LM Studio (Local API)"
-                onModelChange={handleModelChange}
-                availablePrompts={availablePrompts}
-                selectedPrompt={selectedPrompt}
-                onPromptChange={setSelectedPrompt}
               />
             )}
 
@@ -699,6 +768,11 @@ function App() {
               onToggleExtractionPanel={() => setShowExtractionPanel(prev => !prev)}
               onHideSelected={handleHideSelected}
               onToggleShowHidden={() => setShowHidden(!showHidden)}
+              availablePrompts={availablePrompts}
+              selectedPrompt={selectedPrompt}
+              onPromptChange={setSelectedPrompt}
+              selectedModel={aiStatusMessage === 'LM Studio Connected' ? 'LM Studio' : 'Not Connected'}
+              onModelChange={handleModelChange}
             />
           </div>
 

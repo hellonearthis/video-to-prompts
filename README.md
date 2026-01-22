@@ -267,3 +267,31 @@ The application has been refactored to use a **100% Class-Based CSS architecture
 ## License
 
 MIT
+
+## LTX-2 Prompting Guide
+
+### Narrative Flow
+**Role**: AI Cinematographer and LTX2 Prompt Engineer.
+**Output Rules**:
+1.  **Single Flowing Paragraph**: No bullet points or line breaks.
+2.  **Present-Tense Action Verbs**: Use "walks," "tilts," "glides" (not "was walking").
+3.  **Explicit Camera Behavior**: Use specific moves like "The camera pans," "tracks," "pushes in," "tilts up," "glides overhead," or "cuts to".
+4.  **Audio Integration**: Weave audio descriptions directly into the narrative (e.g., "the low rumble of explosions rolls across the dunes"). Dialogue stays in "double quotes".
+5.  **Show, Don't Tell**: Translate emotions into physical cues (e.g., "shoulders slump" instead of "sadness").
+6.  **Visual Details**: Incorporate lighting, texture, and atmosphere (fog, dust, neon glow).
+7.  **Transitions**: Use connectors like "then," "suddenly," "meanwhile," or "as".
+
+### Dialogue Sequencing
+1.  **Quotation Marks and Attribution**: Place spoken text in double quotes and identify the speaker.
+    - *Example*: The woman says softly, "That’s it... Dad’s lost it."
+2.  **Control the "Director’s Eye"**: Describe the visual shift (camera move) when a new character speaks.
+    - *Example*: The camera slowly pans right, revealing the grandfather... He shouts, "Wheeeew!"
+3.  **Narrative Connectors**: Use transition words like "then," "responds," "a beat," or "followed by".
+4.  **Emotional and Vocal Cues**: Describe how the line is delivered (whispering, shouting, deadpan) and accents.
+
+> [!TIP]
+> **Transformation Logic**:
+> - JSON summary → Establishing Shot (Wide view)
+> - JSON key_entities → Subject Definitions (Costume, appearance, lighting)
+> - JSON uncertainty → Visual Ambiguity (Shadows, blur, distance)
+> - JSON sound → Atmospheric Description

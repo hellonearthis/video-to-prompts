@@ -174,6 +174,18 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   loadStoryTimeline: (outputDir: string) =>
     ipcRenderer.invoke('load-story-timeline', outputDir),
 
+  /**
+   * Save persistent analysis data for all frames.
+   */
+  saveFramesData: (outputDir: string, framesData: any[]) =>
+    ipcRenderer.invoke('save-frames-data', outputDir, framesData),
+
+  /**
+   * Load persistent analysis data for frames.
+   */
+  loadFramesData: (outputDir: string) =>
+    ipcRenderer.invoke('load-frames-data', outputDir),
+
   // --------------------------------------------------------------------------
   // AI Analysis APIs
   // --------------------------------------------------------------------------
@@ -200,8 +212,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    * @param promptType - Optional prompt type key
    * @returns Promise resolving to analysis result
    */
-  analyzeFrame: (imagePath: string, promptType?: string) =>
-    ipcRenderer.invoke('analyze-frame', imagePath, promptType),
+  analyzeFrame: (imagePath: string, promptType?: string, videoPath?: string, timestamp?: number) =>
+    ipcRenderer.invoke('analyze-frame', imagePath, promptType, videoPath, timestamp),
 
   /**
    * Analyzes multiple frames in batch.
@@ -210,8 +222,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    * @param imagePaths - Array of image file paths
    * @returns Promise resolving to array of analysis results
    */
-  analyzeFramesBatch: (imagePaths: string[]) =>
-    ipcRenderer.invoke('analyze-frames-batch', imagePaths),
+  analyzeFramesBatch: (batchData: { path: string, videoPath?: string, time?: number }[], promptType?: string) =>
+    ipcRenderer.invoke('analyze-frames-batch', batchData, promptType),
 
   // --------------------------------------------------------------------------
   // Export APIs
@@ -268,4 +280,15 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    */
   exportFlowReport: (outputDir: string, data: object) =>
     ipcRenderer.invoke('export-flow-report', outputDir, data),
+
+  /**
+   * Get the list of recently analyzed videos.
+   */
+  getRecentProjects: () => ipcRenderer.invoke('get-recent-projects'),
+
+  /**
+   * Save or update a project in the history.
+   */
+  saveRecentProject: (projectData: { path: string, name: string }) =>
+    ipcRenderer.invoke('save-recent-project', projectData),
 })

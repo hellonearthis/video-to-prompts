@@ -15,7 +15,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo } from './ffmpeg'
+import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo, extractSingleHighResFrame } from './ffmpeg'
 import fs from 'fs/promises'
 import { existsSync } from 'fs'
 import {
@@ -239,6 +239,33 @@ app.whenReady().then(() => {
   })
 
   /**
+   * Save persistent analysis data for all frames.
+   */
+  ipcMain.handle('save-frames-data', async (_, outputDir: string, framesData: any[]) => {
+    const filePath = path.join(outputDir, 'frames_data.json');
+    try {
+      await fs.writeFile(filePath, JSON.stringify(framesData, null, 2), 'utf-8');
+      return { success: true, path: filePath };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  })
+
+  /**
+   * Load persistent analysis data for frames.
+   */
+  ipcMain.handle('load-frames-data', async (_, outputDir: string) => {
+    const filePath = path.join(outputDir, 'frames_data.json');
+    try {
+      if (!existsSync(filePath)) return { success: true, data: null };
+      const data = await fs.readFile(filePath, 'utf-8');
+      return { success: true, data: JSON.parse(data) };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  })
+
+  /**
    * Handle time-based frame extraction request.
    * Extracts frames at regular time intervals (fps-based sampling).
    * Delegates to the FFmpeg module.
@@ -321,22 +348,47 @@ app.whenReady().then(() => {
    */
   ipcMain.handle('get-available-prompts', async () => {
     const { getAvailablePrompts } = await import('./lmstudio');
-    return { prompts: getAvailablePrompts() };
+    return getAvailablePrompts();
   })
 
   /**
    * Analyze a single frame using LM Studio.
+   * Now optionally takes videoPath and timestamp to extract an HQ frame for analysis.
    */
-  ipcMain.handle('analyze-frame', async (_, imagePath, promptType) => {
-    return await analyzeFrame(imagePath, promptType);
+  ipcMain.handle('analyze-frame', async (_, imagePath, promptType, videoPath?: string, timestamp?: number) => {
+    let targetPath = imagePath;
+    let isTemp = false;
+
+    if (videoPath && timestamp !== undefined) {
+      try {
+        const outputDir = path.dirname(imagePath);
+        targetPath = await extractSingleHighResFrame(videoPath, timestamp, outputDir);
+        isTemp = true;
+        console.log('[AI] Using HQ frame for analysis:', targetPath);
+      } catch (err) {
+        console.error('[AI] HQ extraction failed, falling back to low-res:', err);
+      }
+    }
+
+    const result = await analyzeFrame(targetPath, promptType);
+
+    if (isTemp) {
+      try {
+        await fs.unlink(targetPath);
+      } catch (e) {
+        console.error('[AI] Failed to cleanup temp HQ frame:', e);
+      }
+    }
+
+    return result;
   })
 
   /**
    * Analyze multiple frames in batch using LM Studio.
+   * Fixed: No longer takes frameData objects directly from renderer, but paths and timestamps.
    */
-  ipcMain.handle('analyze-frames-batch', async (_, imagePaths: string[], promptType?: string) => {
-    return await analyzeFramesBatch(imagePaths, promptType, (current, total, result) => {
-      // Notify progress to renderer
+  ipcMain.handle('analyze-frames-batch', async (_, batchData: { path: string, videoPath?: string, time?: number }[], promptType?: string) => {
+    return await analyzeFramesBatch(batchData.map(d => d.path), promptType, (current: number, total: number, result: any) => {
       win?.webContents.send('analysis-progress', { current, total, result });
     });
   })
@@ -476,4 +528,63 @@ app.whenReady().then(() => {
       }
     }
   })
+
+  // --------------------------------------------------------------------------
+  // History Handlers
+  // --------------------------------------------------------------------------
+
+  const historyPath = path.join(app.getPath('userData'), 'history.json');
+
+  /**
+   * Get the list of recently analyzed videos.
+   */
+  ipcMain.handle('get-recent-projects', async () => {
+    try {
+      if (!existsSync(historyPath)) return { success: true, projects: [] };
+      const data = await fs.readFile(historyPath, 'utf-8');
+      const projects = JSON.parse(data);
+
+      // Basic validation: check if video or extraction folder exists
+      // We keep broken ones but maybe flag them? For now just return all.
+      return {
+        success: true, projects: projects.sort((a: any, b: any) =>
+          new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime()
+        )
+      };
+    } catch (error) {
+      console.error('[HISTORY] Failed to load history:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  /**
+   * Save or update a project in the history.
+   */
+  ipcMain.handle('save-recent-project', async (_, projectData: { path: string, name: string }) => {
+    try {
+      let projects = [];
+      if (existsSync(historyPath)) {
+        const data = await fs.readFile(historyPath, 'utf-8');
+        projects = JSON.parse(data);
+      }
+
+      // remove existing if present
+      projects = projects.filter((p: any) => p.path !== projectData.path);
+
+      // add new to top
+      projects.unshift({
+        ...projectData,
+        lastAccessed: new Date().toISOString()
+      });
+
+      // Limit to 20
+      projects = projects.slice(0, 20);
+
+      await fs.writeFile(historyPath, JSON.stringify(projects, null, 2), 'utf-8');
+      return { success: true };
+    } catch (error) {
+      console.error('[HISTORY] Failed to save history:', error);
+      return { success: false, error: String(error) };
+    }
+  });
 })
