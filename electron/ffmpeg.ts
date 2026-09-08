@@ -460,3 +460,226 @@ export const extractSingleHighResFrame = async (filePath: string, timestamp: num
         proc.on('error', reject);
     });
 };
+
+/**
+ * ============================================================================
+ * TUTORIAL: FAST HIGH-EFFICIENCY SCALED FRAME EXTRACTION
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * Slices a single video frame at an exact timestamp and scales it to fit within
+ * the model's target resolution (default: 640x360).
+ * 
+ * WHY -ss GOES BEFORE -i (INPUT SEEKING VS OUTPUT SEEKING):
+ * When `-ss <timestamp>` is placed BEFORE `-i <filePath>`, FFmpeg uses input seeking.
+ * Instead of decoding all audio/video frames from 0.0s up to the target timestamp
+ * (which takes seconds for long videos), FFmpeg seeks directly to the nearest keyframe
+ * at the container demuxer level and only decodes the delta to the requested frame.
+ * This reduces extraction time from ~3,000ms down to ~60ms per frame!
+ * 
+ * HOW THE ASPECT RATIO FILTER WORKS:
+ * `scale='if(gt(iw,ih),640,360)':'if(gt(iw,ih),360,640)':force_original_aspect_ratio=decrease`
+ * - If the video is landscape (iw > ih), it bounds the image within 640x360.
+ * - If the video is portrait/vertical (ih > iw, like TikTok/Reels), it bounds within 360x640.
+ * - `force_original_aspect_ratio=decrease` prevents stretching or letterbox bars.
+ */
+export const extractScaledFrameAtTime = async (
+    videoFilePath: string,
+    targetTimestampInSeconds: number,
+    destinationPngPath: string,
+    maximumBoundingWidth = 640,
+    maximumBoundingHeight = 360
+): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const parentDirectory = path.dirname(destinationPngPath);
+        if (!fs.existsSync(parentDirectory)) {
+            fs.mkdirSync(parentDirectory, { recursive: true });
+        }
+
+        const adaptiveScaleFilter =
+            `scale='if(gt(iw,ih),${maximumBoundingWidth},${maximumBoundingHeight})':` +
+            `'if(gt(iw,ih),${maximumBoundingHeight},${maximumBoundingWidth})':force_original_aspect_ratio=decrease`;
+
+        const ffmpegArgumentList = [
+            '-ss', targetTimestampInSeconds.toString(), // Fast container-level seeking
+            '-i', videoFilePath,
+            '-frames:v', '1',                           // Extract exactly 1 visual frame
+            '-vf', adaptiveScaleFilter,                 // Apply aspect-ratio-preserving downscale
+            '-q:v', '2',                                // High JPEG/PNG visual quality
+            '-y',                                       // Overwrite destination file without prompting
+            destinationPngPath
+        ];
+
+        const ffmpegChildProcess = spawn(getFfmpegPath(), ffmpegArgumentList);
+        ffmpegChildProcess.on('close', (exitCode) => {
+            if (exitCode === 0) {
+                resolve(destinationPngPath);
+            } else {
+                reject(new Error(`Scaled frame extraction failed with exit code ${exitCode}`));
+            }
+        });
+        ffmpegChildProcess.on('error', (spawnError) => {
+            reject(spawnError);
+        });
+    });
+};
+
+/**
+ * ============================================================================
+ * TUTORIAL: WHOLE-VIDEO COARSE PASS — MIDPOINT INTERVAL SAMPLING
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * Extracts exactly N evenly-spaced frames spanning the entire video duration.
+ * 
+ * WHY WE USE MIDPOINT INTERVAL SAMPLING:
+ * If a video is 100 seconds long and we extract 4 frames:
+ * - Naive border sampling: [0s, 33s, 66s, 100s]
+ *   Problem: 0s is almost always a black screen, production logo, or silent intro,
+ *   and 100s is almost always closing credits or fade-to-black.
+ * - Midpoint sampling:
+ *   Interval width = 100 / 4 = 25s.
+ *   Chunk 1: [0s - 25s]   -> Midpoint = 12.5s
+ *   Chunk 2: [25s - 50s]  -> Midpoint = 37.5s
+ *   Chunk 3: [50s - 75s]  -> Midpoint = 62.5s
+ *   Chunk 4: [75s - 100s] -> Midpoint = 87.5s
+ *   Result: Every segment is represented by its central action beat, completely
+ *   avoiding intro black frames and credit scrolls!
+ */
+export const extractEvenlySpacedFrames = async (
+    videoFilePath: string,
+    outputDestinationDirectory: string,
+    targetFrameCount = 16,
+    maximumBoundingWidth = 640,
+    maximumBoundingHeight = 360
+): Promise<FrameData[]> => {
+    const videoMetadata = await getVideoInfo(videoFilePath);
+    const totalVideoDurationSeconds = videoMetadata.duration || 1;
+    const actualExtractedFrameCount = Math.min(
+        targetFrameCount,
+        Math.max(1, Math.floor(totalVideoDurationSeconds * 2))
+    );
+    const intervalStepSeconds = totalVideoDurationSeconds / actualExtractedFrameCount;
+
+    // Calculate midpoint timestamps for each equal temporal interval
+    const midpointTimestampArray: number[] = Array.from(
+        { length: actualExtractedFrameCount },
+        (_, intervalIndex) => {
+            const midpointTimestamp = (intervalIndex + 0.5) * intervalStepSeconds;
+            return Math.max(0, Math.min(midpointTimestamp, Math.max(0, totalVideoDurationSeconds - 0.05)));
+        }
+    );
+
+    if (!fs.existsSync(outputDestinationDirectory)) {
+        fs.mkdirSync(outputDestinationDirectory, { recursive: true });
+    }
+
+    const extractedFrameDataList: FrameData[] = [];
+
+    // Extract frames sequentially to prevent spawning 16 heavy child processes at once
+    for (let frameIndex = 0; frameIndex < midpointTimestampArray.length; frameIndex++) {
+        const timestampSeconds = midpointTimestampArray[frameIndex];
+        const sanitizedTimestampString = timestampSeconds.toFixed(2).replace('.', '_');
+        const outputPngFilename = `coarse_${frameIndex.toString().padStart(2, '0')}_${sanitizedTimestampString}s.png`;
+        const outputPngFullPath = path.join(outputDestinationDirectory, outputPngFilename);
+
+        try {
+            await extractScaledFrameAtTime(
+                videoFilePath,
+                timestampSeconds,
+                outputPngFullPath,
+                maximumBoundingWidth,
+                maximumBoundingHeight
+            );
+            extractedFrameDataList.push({
+                path: outputPngFullPath,
+                time: timestampSeconds
+            });
+        } catch (extractionError) {
+            console.warn(`[FFMPEG] Failed to extract coarse frame at ${timestampSeconds}s:`, extractionError);
+        }
+    }
+
+    return extractedFrameDataList;
+};
+
+/**
+ * ============================================================================
+ * TUTORIAL: PHASE B ZOOM WINDOW EXTRACTION
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * Extracts a sequence of high-density frames within a narrow temporal window
+ * (e.g. [12.0s to 18.0s] at 4 FPS).
+ * 
+ * WHY FPS AND FRAME COUNT ARE HARD-CAPPED:
+ * When an autonomous agent requests a zoom, it may hallucinate an extreme value
+ * like `fps: 1000`. If passed directly to FFmpeg, the system would attempt to extract
+ * 6,000 images, freeze the application, and consume gigabytes of disk space.
+ * We compute `targetCount = Math.min(maxFrames, Math.round(duration * fps))` to enforce
+ * an unbreachable ceiling (default: 10 frames max per window).
+ */
+export const extractWindowFrames = async (
+    videoFilePath: string,
+    outputDestinationDirectory: string,
+    windowStartSeconds: number,
+    windowEndSeconds: number,
+    samplingFramesPerSecond = 4,
+    maximumAllowedFramesCount = 10,
+    maximumBoundingWidth = 640,
+    maximumBoundingHeight = 360
+): Promise<FrameData[]> => {
+    const videoMetadata = await getVideoInfo(videoFilePath);
+    const totalVideoDurationSeconds = videoMetadata.duration || 1;
+
+    // Clamp boundaries within valid video duration
+    const clampedWindowStartSeconds = Math.max(0, Math.min(windowStartSeconds, totalVideoDurationSeconds - 0.1));
+    const clampedWindowEndSeconds = Math.min(totalVideoDurationSeconds, Math.max(clampedWindowStartSeconds + 0.2, windowEndSeconds));
+    const windowDurationSeconds = clampedWindowEndSeconds - clampedWindowStartSeconds;
+
+    // Calculate frame count bounded by maximumAllowedFramesCount
+    const calculatedFrameCount = Math.min(
+        maximumAllowedFramesCount,
+        Math.max(2, Math.round(windowDurationSeconds * samplingFramesPerSecond))
+    );
+    const temporalStepSeconds = windowDurationSeconds / (calculatedFrameCount - 1);
+
+    const timestampSamplingArray: number[] = Array.from(
+        { length: calculatedFrameCount },
+        (_, frameStepIndex) => {
+            const computedTimestamp = clampedWindowStartSeconds + frameStepIndex * temporalStepSeconds;
+            return Math.min(clampedWindowEndSeconds, Math.max(clampedWindowStartSeconds, computedTimestamp));
+        }
+    );
+
+    if (!fs.existsSync(outputDestinationDirectory)) {
+        fs.mkdirSync(outputDestinationDirectory, { recursive: true });
+    }
+
+    const windowExtractedFrameList: FrameData[] = [];
+
+    for (let frameIndex = 0; frameIndex < timestampSamplingArray.length; frameIndex++) {
+        const timestampSeconds = timestampSamplingArray[frameIndex];
+        const sanitizedTimestampString = timestampSeconds.toFixed(2).replace('.', '_');
+        const outputPngFilename = `zoom_${frameIndex.toString().padStart(2, '0')}_${sanitizedTimestampString}s.png`;
+        const outputPngFullPath = path.join(outputDestinationDirectory, outputPngFilename);
+
+        try {
+            await extractScaledFrameAtTime(
+                videoFilePath,
+                timestampSeconds,
+                outputPngFullPath,
+                maximumBoundingWidth,
+                maximumBoundingHeight
+            );
+            windowExtractedFrameList.push({
+                path: outputPngFullPath,
+                time: timestampSeconds
+            });
+        } catch (extractionError) {
+            console.warn(`[FFMPEG] Failed to extract zoom frame at ${timestampSeconds}s:`, extractionError);
+        }
+    }
+
+    return windowExtractedFrameList;
+};

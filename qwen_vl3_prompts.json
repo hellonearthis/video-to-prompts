@@ -9,8 +9,83 @@
     "Video Summary",
     "Short Story",
     "Prompt Refine & Expand",
-    "Ultra Cinematic Detailed"
+    "Ultra Cinematic Detailed",
+    "--- MODULAR PRESETS ---",
+    "Modular: Noir Detective",
+    "Modular: Sci-Fi World",
+    "Modular: Studio Portrait",
+    "Modular: Nature Documentary"
   ],
+  "styles": {
+    "Poetic": "Rewrite the following description as a free-verse poem. Focus on emotion, sensory details, and metaphor. Do not add new visual information.",
+    "Glitch": "Rewrite the description using 'glitch art' aesthetics: fragmented sentences, corrupted data strings (e.g. [ERR_01]), and digital noise metaphors.",
+    "Documentary": "Rewrite the description as a neutral, objective historical record or scientific observation. Use formal, detached language.",
+    "Screenplay": "Format the description as a standard screenplay scene heading (EXT. LOCATION - TIME) followed by an action block.",
+    "Midjourney": "Convert the description into a comma-separated list of keywords and tokens optimized for generative AI (e.g. Midjourney V6). Focus on subject, medium, style, lighting, and composition."
+  },
+  "refinements": {
+    "Conflict Check": "Analyze the description for logical inconsistencies (e.g., conflicting lighting sources, impossible geometry, anachronisms). If found, list them. If none, verify 'No conflicts found'."
+  },
+  "modules": {
+    "lighting": {
+      "standard": "Describe the lighting sources, direction, and quality (hard/soft shadows).",
+      "cinematic": "Analyze the lighting using cinematic terminology: identify key light, fill light, back light, practical sources, and any atmospheric effects (fog, haze).",
+      "volumetric": "Focus on light interaction with the atmosphere: look for volumetric rays ('God rays'), bloom, glow, and suspended dust particles.",
+      "studio": "Describe the lighting setup as if in a photography studio (e.g., Rembrandt, Butterfly, or Split lighting patterns). Note the contrast ratio.",
+      "color": "Analyze specific color temperatures (warm vs cool contrast) and any artificial colored lighting (neon, gels)."
+    },
+    "theme": {
+      "photorealistic": "Focus on realism and physical accuracy. Describe the image as if it were a high-resolution photograph.",
+      "artistic": "Describe the image as an artwork. Analyze the medium (oil, watercolor, digital), brushwork, and stylistic influences.",
+      "noir": "Analyze the scene using Film Noir tropes: high contrast (chiaroscuro), deep shadows, urban decay, and a mood of cynicism or suspense.",
+      "scifi": "Analyze the scene using Sci-Fi tropes: advanced technology, futuristic architecture, neon aesthetics, and functional design."
+    },
+    "scene": {
+      "spatial": "Describe the layout, depth perception, and spatial relationships between elements (foreground, midground, background).",
+      "world_building": "Infer the history and context of the location based on visual clues (decay, architecture, technology, signage)."
+    },
+    "characters": {
+      "demographic": "Describe any visible people: estimated age, gender, and ethnicity.",
+      "fashion": "Analyze clothing in detail: fabric textures, style (era/genre), fit, and accessories.",
+      "emotion": "Analyze micro-expressions, body language, and the apparent emotional state of the subjects."
+    },
+    "objects": {
+      "inventory": "List the distinct primary objects visible in the scene.",
+      "materiality": "Describe the textures and material properties of objects (e.g., rust, polished metal, velvet, slime, matte plastic)."
+    },
+    "mood": {
+      "emotional": "What emotional response does the image evoke? (e.g. Melancholy, Joy, Dread, Serenity).",
+      "sensory": "Describe implied sensory details based on the visuals: temperature, smell, sound, and humidity."
+    }
+  },
+  "presets": {
+    "Modular: Noir Detective": [
+      "theme.noir",
+      "lighting.cinematic",
+      "characters.fashion",
+      "mood.emotional",
+      "scene.world_building"
+    ],
+    "Modular: Sci-Fi World": [
+      "theme.scifi",
+      "lighting.color",
+      "objects.materiality",
+      "scene.world_building"
+    ],
+    "Modular: Studio Portrait": [
+      "theme.photorealistic",
+      "lighting.studio",
+      "characters.demographic",
+      "characters.emotion",
+      "modules.camera.lens"
+    ],
+    "Modular: Nature Documentary": [
+      "theme.photorealistic",
+      "scene.spatial",
+      "lighting.standard",
+      "modules.mood.sensory"
+    ]
+  },
   "qwenvl": {
     "Tags": "Your task is to generate a clean list of comma-separated tags for a text-to-image AI, based *only* on the visual information in the image. Limit the output to a maximum of 50 unique tags. Strictly describe visual elements like subject, clothing, environment, colors, lighting, and composition. Do not include abstract concepts, interpretations, marketing terms, or technical jargon (e.g., no 'SEO', 'brand-aligned', 'viral potential'). The goal is a concise list of visual descriptors. Avoid repeating tags.",
     "Simple Description": "Analyze the image and write a single concise sentence that describes the main subject and setting. Keep it grounded in visible details only.",

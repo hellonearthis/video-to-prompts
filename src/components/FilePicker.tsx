@@ -14,7 +14,7 @@
  * file system path, unlike standard web File objects.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FilePicker.css';
 
 // ============================================================================
@@ -38,41 +38,64 @@ export const FilePicker: React.FC<FilePickerProps> = ({ onFileSelected }) => {
     const [dragActive, setDragActive] = useState(false);
 
     // --------------------------------------------------------------------------
-    // Drag Event Handlers
+    // Global Drag/Drop Handlers
     // --------------------------------------------------------------------------
 
-    /**
-     * Handles dragenter, dragover, and dragleave events.
-     * Updates the visual state to indicate when a file is being dragged over.
-     */
-    const handleDrag = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.type === 'dragenter' || e.type === 'dragover') {
-            setDragActive(true);
-        } else if (e.type === 'dragleave') {
-            setDragActive(false);
-        }
-    };
-
-    /**
-     * Handles the drop event when a file is released over the drop zone.
-     * Extracts the file path and notifies the parent component.
-     */
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDragActive(false);
-
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            // Cast to 'any' to access Electron's extended File properties
-            const file = e.dataTransfer.files[0] as any;
-            if (file.path) {
-                onFileSelected(file.path);
+    useEffect(() => {
+        /**
+         * Global drag handler to prevent default behavior and show active state.
+         */
+        const handleGlobalDrag = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.type === 'dragenter' || e.type === 'dragover') {
+                setDragActive(true);
             }
-        }
-    };
+        };
+
+        /**
+         * Global dragleave handler.
+         */
+        const handleGlobalDragLeave = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Only deactivate if we're leaving the window
+            if (e.relatedTarget === null) {
+                setDragActive(false);
+            }
+        };
+
+        /**
+         * Global drop handler to catch files dropped anywhere.
+         */
+        const handleGlobalDrop = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDragActive(false);
+
+            if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                const path = window.ipcRenderer.getPathForFile(file);
+                if (path) {
+                    onFileSelected(path);
+                }
+            }
+        };
+
+        // Register global listeners
+        window.addEventListener('dragenter', handleGlobalDrag);
+        window.addEventListener('dragover', handleGlobalDrag);
+        window.addEventListener('dragleave', handleGlobalDragLeave);
+        window.addEventListener('drop', handleGlobalDrop);
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('dragenter', handleGlobalDrag);
+            window.removeEventListener('dragover', handleGlobalDrag);
+            window.removeEventListener('dragleave', handleGlobalDragLeave);
+            window.removeEventListener('drop', handleGlobalDrop);
+        };
+    }, [onFileSelected]);
 
     // --------------------------------------------------------------------------
     // Click Handler
@@ -96,10 +119,6 @@ export const FilePicker: React.FC<FilePickerProps> = ({ onFileSelected }) => {
     return (
         <div
             className={`file-picker ${dragActive ? 'drag-active' : ''}`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
             onClick={handleClick}
         >
             {/* Primary instruction text */}

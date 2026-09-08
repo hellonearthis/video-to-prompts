@@ -7,6 +7,7 @@ interface NavBarProps {
     onViewChange: (view: 'frames' | 'storyboard') => void;
     fileName?: string | null;
     hasTimelineItems: boolean;
+    onOpenSmartStoryboard?: () => void;
 }
 
 export const NavBar: React.FC<NavBarProps> = ({
@@ -14,7 +15,8 @@ export const NavBar: React.FC<NavBarProps> = ({
     currentView,
     onViewChange,
     fileName,
-    hasTimelineItems
+    hasTimelineItems,
+    onOpenSmartStoryboard
 }) => {
     return (
         <nav className="navbar">
@@ -51,7 +53,27 @@ export const NavBar: React.FC<NavBarProps> = ({
             </div>
 
             <div className="navbar-right">
-                {/* Placeholder for future top-right controls if needed */}
+                {fileName && onOpenSmartStoryboard && (
+                    <button
+                        onClick={onOpenSmartStoryboard}
+                        className="nav-btn smart-storyboard-btn"
+                        style={{
+                            background: 'linear-gradient(135deg, #007aff, #8a2be2)',
+                            color: '#ffffff',
+                            fontWeight: 600,
+                            border: 'none',
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 8px rgba(0, 122, 255, 0.35)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                        }}
+                    >
+                        ⚡ Smart Storyboard
+                    </button>
+                )}
             </div>
         </nav>
     );

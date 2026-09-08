@@ -355,7 +355,7 @@ app.whenReady().then(() => {
    * Analyze a single frame using LM Studio.
    * Now optionally takes videoPath and timestamp to extract an HQ frame for analysis.
    */
-  ipcMain.handle('analyze-frame', async (_, imagePath, promptType, videoPath?: string, timestamp?: number) => {
+  ipcMain.handle('analyze-frame', async (_, imagePath, promptType, videoPath?: string, timestamp?: number, options?: { style?: string, refinement?: string }) => {
     let targetPath = imagePath;
     let isTemp = false;
 
@@ -370,7 +370,8 @@ app.whenReady().then(() => {
       }
     }
 
-    const result = await analyzeFrame(targetPath, promptType);
+    // Pass options to analyzeFrame
+    const result = await analyzeFrame(targetPath, promptType, options);
 
     if (isTemp) {
       try {
@@ -449,6 +450,93 @@ app.whenReady().then(() => {
   ipcMain.handle('analyze-story-sequence', async (_, imagePaths: string[]) => {
     const { analyzeSequence } = await import('./lmstudio');
     return await analyzeSequence(imagePaths);
+  })
+
+  // --------------------------------------------------------------------------
+  // Agentic Storyboard Extraction IPC Handlers
+  // --------------------------------------------------------------------------
+
+  /**
+   * ============================================================================
+   * TUTORIAL: NATIVE FILE PICKER FOR TRANSCRIPTS
+   * ============================================================================
+   * 
+   * WHAT THIS HANDLER DOES:
+   * Opens a native OS file dialog (Windows Explorer / macOS Finder) restricted
+   * specifically to SubRip subtitle files (*.srt).
+   * 
+   * WHY NATIVE DIALOGS ARE PREFERRED OVER HTML <input type="file">:
+   * In Electron desktop apps, native dialogs have direct access to absolute filesystem
+   * paths (e.g., "C:\Users\...\audio.srt"). Web inputs obscure the absolute path
+   * behind a browser security sandbox, making backend processing difficult.
+   * 
+   * @returns Absolute path to the selected .srt file, or null if the user cancelled
+   */
+  ipcMain.handle('select-transcript-file', async () => {
+    const dialogSelectionResult = await dialog.showOpenDialog(win!, {
+      title: 'Select SubRip Transcript File (*.srt)',
+      properties: ['openFile'],
+      filters: [
+        { name: 'SubRip Transcript Files (*.srt)', extensions: ['srt'] },
+        { name: 'All Files (*.*)', extensions: ['*'] }
+      ]
+    });
+    return dialogSelectionResult.filePaths[0] || null;
+  })
+
+  /**
+   * ============================================================================
+   * TUTORIAL: AGENTIC STORYBOARD IPC ORCHESTRATION & PROGRESS STREAMING
+   * ============================================================================
+   * 
+   * WHAT THIS HANDLER DOES:
+   * Executes the autonomous multi-turn video understanding pipeline and streams
+   * granular progress updates back to the React UI window.
+   * 
+   * HOW THE STREAMING BACK-CHANNEL WORKS:
+   * 1. The React renderer invokes this handler via `window.ipcRenderer.extractAgenticStoryboard()`.
+   * 2. The handler begins running the agent loop in the Node.js main process.
+   * 3. At every pipeline stage (Coarse scan -> Candidates -> Zoom pass -> Prompt generation),
+   *    the `onProgress` callback pushes an event directly to `win?.webContents.send('agent-progress', ...)`.
+   * 4. React listens via `window.ipcRenderer.on('agent-progress', ...)` and updates the UI in real time.
+   * 5. When all candidates are complete, the handler returns the final `StoryboardEntry[]` array.
+   */
+  ipcMain.handle('extract-agentic-storyboard', async (_, extractionOptions: {
+    videoPath: string;
+    outputDir: string;
+    transcriptPath?: string | null;
+    maxCandidates?: number;
+    promptType?: string;
+  }) => {
+    try {
+      const { extractStoryboard } = await import('./agent/storyboardExtractor.ts');
+      const generatedStoryboardEntries = await extractStoryboard({
+        ...extractionOptions,
+        onProgress: (realtimeProgressEvent) => {
+          // Push real-time stage updates to the renderer window
+          win?.webContents.send('agent-progress', realtimeProgressEvent);
+        },
+      });
+      return { success: true, entries: generatedStoryboardEntries };
+    } catch (pipelineExecutionError) {
+      console.error('[AGENTIC_IPC] Autonomous extraction pipeline failed:', pipelineExecutionError);
+      
+      const humanReadableErrorMessage =
+        pipelineExecutionError instanceof Error
+          ? pipelineExecutionError.message
+          : String(pipelineExecutionError);
+
+      // Notify UI of the error condition
+      win?.webContents.send('agent-progress', {
+        status: 'error',
+        message: humanReadableErrorMessage,
+      });
+
+      return {
+        success: false,
+        error: humanReadableErrorMessage,
+      };
+    }
   })
 
   // --------------------------------------------------------------------------

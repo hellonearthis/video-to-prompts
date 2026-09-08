@@ -12,7 +12,7 @@
  * The exposed APIs become available in the renderer as `window.ipcRenderer`.
  */
 
-import { ipcRenderer, contextBridge } from 'electron'
+import { ipcRenderer, contextBridge, webUtils } from 'electron'
 
 // ============================================================================
 // IPC Bridge Setup
@@ -291,4 +291,42 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
    */
   saveRecentProject: (projectData: { path: string, name: string }) =>
     ipcRenderer.invoke('save-recent-project', projectData),
+
+  /**
+   * Securely get the file path from a File object.
+   * Required for modern Electron versions.
+   */
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
+
+  /**
+   * Opens the native OS file picker dialog to let the user select an external
+   * SubRip subtitle (.srt) transcript file (e.g. exported from ComfyUI Qwen ASR).
+   * 
+   * @returns Promise resolving to the absolute filesystem path, or null if cancelled
+   */
+  selectTranscriptFile: () => ipcRenderer.invoke('select-transcript-file'),
+
+  /**
+   * Executes the autonomous Agentic Storyboard Extractor pipeline.
+   * 
+   * WHAT IT DOES:
+   * 1. Samples 16 coarse frames across the whole video.
+   * 2. Runs Phase A turning-point detection with optional spoken dialogue context.
+   * 3. Runs Phase B zoom loops with integer frame-index grounding and localized dialogue cues.
+   * 4. Synthesizes cinematic image-generation prompts using the selected prompt preset.
+   * 
+   * @param options.videoPath - Absolute path to the source video file
+   * @param options.outputDir - Project directory for frame caching and disk persistence
+   * @param options.transcriptPath - Optional absolute path to an external .srt subtitle file
+   * @param options.maxCandidates - Number of key turning point beats to identify (defaults to 5)
+   * @param options.promptType - Prompt preset name from qwen_vl3_prompts.json
+   * @returns Promise resolving to { success: boolean, entries?: StoryboardEntry[], error?: string }
+   */
+  extractAgenticStoryboard: (options: {
+    videoPath: string;
+    outputDir: string;
+    transcriptPath?: string | null;
+    maxCandidates?: number;
+    promptType?: string;
+  }) => ipcRenderer.invoke('extract-agentic-storyboard', options),
 })

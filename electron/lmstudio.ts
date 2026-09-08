@@ -31,6 +31,10 @@ const LM_STUDIO_URL = 'http://localhost:1234/v1/chat/completions';
 export interface FrameAnalysis {
     /** Brief description of the image content */
     summary: string;
+    /** Output from a specific style transformation (e.g. Poetic, Glitch) */
+    styled_content?: string;
+    /** Result of a conflict/consistency check */
+    consistency_check?: string;
     /** List of detected objects */
     objects: string[];
     /** Descriptive tags */
@@ -54,9 +58,13 @@ export interface AnalysisResult {
     error?: string;
 }
 
-// ============================================================================
-// Analysis Functions
-// ============================================================================
+/**
+ * Options for analysis.
+ */
+export interface AnalysisOptions {
+    style?: string; // e.g., "Poetic", "Glitch"
+    refinement?: string; // e.g., "Conflict Check"
+}
 
 // ============================================================================
 // Comparison Types
@@ -88,44 +96,33 @@ export interface FrameComparisonResult {
 }
 
 // ============================================================================
-// Analysis Functions
-// ============================================================================
-
-// ============================================================================
 // Prompt Management
 // ============================================================================
 
-const DEFAULT_PROMPTS = {
+interface PromptsConfig {
+    _preset_prompts: string[];
+    modules?: Record<string, Record<string, string>>;
+    presets?: Record<string, string[]>;
+    styles?: Record<string, string | { system_prompt: string }>;
+    refinements?: Record<string, string>;
+    qwenvl?: Record<string, string>;
+}
+
+const DEFAULT_PROMPTS: PromptsConfig = {
     "_preset_prompts": [
-        "Tags",
         "Simple Description",
-        "Detailed Description",
-        "Ultra Detailed Description",
-        "Cinematic Description",
-        "Detailed Analysis",
-        "Video Summary",
-        "Short Story",
-        "Prompt Refine & Expand",
-        "Ultra Cinematic Detailed"
+        "Detailed Description"
     ],
     "qwenvl": {
-        "Tags": "Your task is to generate a clean list of comma-separated tags for a text-to-image AI, based *only* on the visual information in the image. Limit the output to a maximum of 50 unique tags. Strictly describe visual elements like subject, clothing, environment, colors, lighting, and composition. Do not include abstract concepts, interpretations, marketing terms, or technical jargon (e.g., no 'SEO', 'brand-aligned', 'viral potential'). The goal is a concise list of visual descriptors. Avoid repeating tags.",
-        "Simple Description": "Analyze the image and write a single concise sentence that describes the main subject and setting. Keep it grounded in visible details only.",
-        "Detailed Description": "Write ONE detailed paragraph (6 to 10 sentences). Describe only what is visible: subject(s) and actions; people details if present (approx age group, gender expression if clear, hair, facial expression, pose, clothing, accessories); environment (location type, background elements, time cues); lighting (source, direction, softness/hardness, color temperature, shadows); camera viewpoint (eye-level/low/high, distance) and composition (framing, focal emphasis). No preface, no reasoning, no <think>.",
-        "Ultra Detailed Description": "Write ONE ultra-detailed paragraph (10 to 16 sentences, or 180 to 320 words). Stay grounded in visible details. Include: subject micro-details (materials, textures, patterns, wear, reflections); people details if present (hair, skin tones, makeup, jewelry, fabric types, fit); environment depth (foreground/midground/background, signage/props, surface materials); lighting analysis (key/fill/back light, direction, softness, highlights, shadow shape); camera perspective (angle, lens feel, depth of field) and composition (leading lines, negative space, symmetry/asymmetry, visual hierarchy). No preface, no reasoning, no <think>.",
-        "Cinematic Description": "Write ONE cinematic paragraph (8 to 12 sentences). Describe the scene like a film still: subject(s) and action; environment and atmosphere; lighting design (practical lights vs ambient, direction, contrast); camera language (shot type, angle, lens feel, depth of field, motion implied); composition and mood. Keep it vivid but factual (no made-up story). No preface, no reasoning, no <think>.",
-        "Detailed Analysis": "Output ONLY these sections with short labels (no bullets): Subject; People (if any); Environment; Lighting; Camera/Composition; Color/Texture. In each section, write 2 to 4 sentences of concrete visible details. If something is not visible, write 'not visible'. No preface, no reasoning, no <think>.",
-        "Video Summary": "Summarize the key events and narrative points in this video.",
-        "Short Story": "Write a short, imaginative story inspired by this image or video.",
-        "Prompt Refine & Expand": "Refine and enhance the following user prompt for creative text-to-image generation. Keep the meaning and keywords, make it more expressive and visually rich. Output ONLY the improved prompt text (no preface, no bullets, no JSON, no <think>, no commentary).",
-        "Ultra Cinematic Detailed": "Analyze this image with EXTREME focus on visual micro-details. Describe every texture (fabric weave, skin pores, surface weathering), lighting nuance (exact color temperature, shadow fall-off, practical sources), and material quality (reflectivity, roughness). Break down the composition, depth of field, and camera lens characteristics. Output ONE dense, highly descriptive paragraph suitable for high-end generative reproduction. No narrative fluff, just pure visual data."
+        "Simple Description": "Analyze the image and write a single concise sentence that describes the main subject and setting.",
+        "Detailed Description": "Write ONE detailed paragraph regarding the image."
     }
 };
 
-let PROMPTS_CACHE: any = null;
+let PROMPTS_CACHE: PromptsConfig | null = null;
 let LAST_SEARCH_LOGS: string[] = [];
 
-const loadPrompts = () => {
+const loadPrompts = (): PromptsConfig | null => {
     if (PROMPTS_CACHE) return PROMPTS_CACHE;
     try {
         const searchPaths = [
@@ -149,7 +146,7 @@ const loadPrompts = () => {
                 const data = fs.readFileSync(p, 'utf-8');
                 try {
                     PROMPTS_CACHE = JSON.parse(data);
-                    LAST_SEARCH_LOGS.push(`Successfully parsed ${PROMPTS_CACHE._preset_prompts?.length || 0} prompts`);
+                    LAST_SEARCH_LOGS.push(`Successfully parsed prompts config`);
                     return PROMPTS_CACHE;
                 } catch (jsonErr) {
                     LAST_SEARCH_LOGS.push(`JSON Parse Error for ${p}: ${String(jsonErr)}`);
@@ -165,28 +162,80 @@ const loadPrompts = () => {
     }
 };
 
-export const getAvailablePrompts = (): { prompts: string[], logs: string[] } => {
+export const getAvailablePrompts = (): {
+    prompts: string[],
+    styles: string[],
+    refinements: string[],
+    logs: string[]
+} => {
     LAST_SEARCH_LOGS = [];
     const data = loadPrompts();
-    if (data && data._preset_prompts) {
-        return { prompts: data._preset_prompts, logs: LAST_SEARCH_LOGS };
-    }
-    // Return default prompts if file load failed
-    return { prompts: DEFAULT_PROMPTS._preset_prompts, logs: LAST_SEARCH_LOGS };
+
+    const prompts = data?._preset_prompts || DEFAULT_PROMPTS._preset_prompts;
+    const styles = data?.styles ? Object.keys(data.styles) : [];
+    const refinements = data?.refinements ? Object.keys(data.refinements) : [];
+
+    return { prompts, styles, refinements, logs: LAST_SEARCH_LOGS };
 };
+
+/**
+ * Resolves a prompt type (string) into a full prompt text string.
+ * Handles Legacy prompts and New Modular Presets.
+ */
+const resolvePromptText = (promptType: string, config: PromptsConfig): string => {
+    // 1. Check Legacy (qwenvl)
+    if (config.qwenvl && config.qwenvl[promptType]) {
+        return config.qwenvl[promptType];
+    }
+
+    // 2. Check Modular Presets
+    if (config.presets && config.presets[promptType]) {
+        const moduleKeys = config.presets[promptType]; // e.g. ["theme.noir", "lighting.cinematic"]
+        let assembledPrompt = "Analyze this image with the following specific focus points:\n\n";
+
+        for (const key of moduleKeys) {
+            // key format: "category.moduleName" e.g. "lighting.cinematic"
+            const [category, moduleName] = key.split('.');
+            if (config.modules && config.modules[category] && config.modules[category][moduleName]) {
+                assembledPrompt += `- ${config.modules[category][moduleName]}\n`;
+            } else if (key.startsWith("modules.") && config.modules) {
+                // Handle explicit "modules.category.name" just in case
+                const parts = key.split('.');
+                if (parts.length === 3 && config.modules[parts[1]] && config.modules[parts[1]][parts[2]]) {
+                    assembledPrompt += `- ${config.modules[parts[1]][parts[2]]}\n`;
+                }
+            } else {
+                console.warn(`[LM-STUDIO] Warning: Module not found for key '${key}' in preset '${promptType}'`);
+            }
+        }
+
+        assembledPrompt += "\nSynthesize these observations into a cohesive detailed description.";
+        return assembledPrompt;
+    }
+
+    // 3. Fallback
+    return DEFAULT_PROMPTS.qwenvl!["Simple Description"];
+};
+
+// ============================================================================
+// Analysis Functions
+// ============================================================================
 
 /**
  * Analyzes a single image frame using LM Studio's vision model.
  * 
  * @param imagePath - Absolute path to the image file
- * @param promptType - Optional key for the prompt to use (from qwen_vl3_prompts.json)
- * @returns Promise resolving to analysis result
+ * @param promptType - Key for the prompt (Preset or Legacy)
+ * @param options - Additional options for Styles and Refinement
  */
-export const analyzeFrame = async (imagePath: string, promptType?: string): Promise<AnalysisResult> => {
+export const analyzeFrame = async (
+    imagePath: string,
+    promptType?: string,
+    options?: AnalysisOptions
+): Promise<AnalysisResult> => {
     console.log(`[LM-STUDIO] Analyzing frame: ${imagePath} with prompt: ${promptType || 'Default'}`);
 
     try {
-        // Read image file and convert to base64
         if (!fs.existsSync(imagePath)) {
             throw new Error(`Image file not found: ${imagePath}`);
         }
@@ -194,96 +243,50 @@ export const analyzeFrame = async (imagePath: string, promptType?: string): Prom
         const imageBuffer = fs.readFileSync(imagePath);
         const base64Data = imageBuffer.toString('base64');
         const mimeType = getMimeType(imagePath);
-
-        console.log(`[LM-STUDIO] Image size: ${imageBuffer.length} bytes, type: ${mimeType}`);
+        const currentModel = await getCurrentModel();
 
         // Load prompts
         let prompts = loadPrompts();
         if (!prompts) prompts = DEFAULT_PROMPTS;
-        let promptText = "";
 
-        // Determine prompt to use
-        if (promptType && prompts && prompts.qwenvl && prompts.qwenvl[promptType]) {
-            promptText = prompts.qwenvl[promptType];
+        // Resolve Main Vision Prompt
+        let visionPromptText = resolvePromptText(promptType || "Simple Description", prompts);
 
-            // If it's the "Detailed Analysis" prompt, we need to guide the JSON output specifically
-            // Or if the user expects JSON, we should wrap it.
-            // The existing code expects a specific JSON structure.
-            // PROMPT ADAPTATION:
-            // If the custom prompt doesn't ask for JSON, the parser will fail.
-            // We need to decide: does the user want PURE text output for these new prompts?
-            // "simple description" says "write a single concise sentence".
-            // The existing return type `FrameAnalysis` EXPECTS structure.
-            // We might need to adjust the return type or wrap the prompt.
+        // Force JSON structure for the main analysis to ensure consistent UI parsing
+        // We wrap the resolved text prompt in a JSON-enforcing wrapper.
+        const systemWrapper = `
+You are a computer vision expert. 
+TASK: ${visionPromptText}
 
-            // STRATEGY: 
-            // 1. If strict JSON structure is required (original behavior), we interpret the prompt instructions 
-            //    embedded in our system prompt.
-            // 2. BUT the new prompts are "Text descriptions".
-            //    "Tags", "Simple Description", "Detailed Description" etc.
-            //    They return TEXT.
-            //    We should probably place this text into the `summary` field or `description` field of the analysis.
-
-            // So we will construct a prompt that asks the model to output JSON where the specific field is populated by the prompt's result.
-            // Actually, simpler: Let's ask for JSON, but tell the model to use the "User Prompt" logic to fill the "summary".
-
-            const basePrompt = `Analyze the provided image based on this specific task:
-### Task
-${promptText}
-
-### Output Requirement
-Return ONLY a valid JSON object. Do not include any conversational filler, preface, or markdown code blocks. 
-
-Structure:
+OUTPUT FORMAT:
+Return ONLY a valid JSON object with this structure:
 {
-    "summary": "MANDATORY: Populate this field with the full result of the Task specified above. Do not truncate or summarize.",
-    "objects": ["primary object", "secondary object", ...],
-    "tags": ["visual tag 1", "visual tag 2", ...],
-    "scene_type": "cinematic/portrait/wide/etc",
+    "summary": "The main detailed description based on the task.",
+    "objects": ["list", "of", "visible", "objects"],
+    "tags": ["visual_tag1", "visual_tag2"],
+    "scene_type": "indoor/outdoor/etc",
     "visual_elements": {
         "dominant_colors": ["#hex1", "#hex2"],
         "lighting": "concise lighting summary"
     }
 }
-Final JSON object:`;
+NO markdown, NO explanations, NO extra text.
+`;
 
-            promptText = basePrompt;
-
-        } else {
-            // Default hardcoded prompt
-            promptText = `Analyze this image and return ONLY a JSON object with this exact structure:
-{
-"summary": "A concise description of the image content.",
-"objects": ["list", "of", "visible", "objects"],
-"tags": ["list", "of", "descriptive", "tags"],
-"scene_type": "indoor/outdoor/portrait/etc",
-"visual_elements": {
-"dominant_colors": ["color1", "color2"],
-"lighting": "description of lighting"
-}
-}
-Do not include markdown formatting or explanations.`;
-        }
-
-
-        // Send request to LM Studio
-        const response = await fetch(LM_STUDIO_URL, {
+        // 1. Call Vision Model
+        const visionResponse = await fetch(LM_STUDIO_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                model: await getCurrentModel(),
+                model: currentModel,
                 messages: [
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: promptText },
+                            { type: "text", text: systemWrapper },
                             {
                                 type: "image_url",
-                                image_url: {
-                                    url: `data:${mimeType};base64,${base64Data}`
-                                }
+                                image_url: { url: `data:${mimeType};base64,${base64Data}` }
                             }
                         ]
                     }
@@ -293,30 +296,21 @@ Do not include markdown formatting or explanations.`;
             })
         });
 
-        if (!response.ok) {
-            throw new Error(`LM Studio API Error: ${response.status} ${response.statusText}`);
-        }
+        if (!visionResponse.ok) throw new Error(`LM Studio API Error (Vision): ${visionResponse.status}`);
 
-        const result = await response.json();
-        let text = result.choices[0].message.content;
+        const visionResult = await visionResponse.json();
+        let visionText = visionResult.choices[0].message.content;
 
-        console.log('[LM-STUDIO] Response received');
-
-        // Remove markdown formatting if present
-        text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-        // Parse JSON response
+        // Clean and Parse JSON
+        visionText = visionText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
         let analysis: FrameAnalysis;
-        try {
-            analysis = JSON.parse(text);
-        } catch (jsonError) {
-            console.error('[LM-STUDIO] JSON parse error:', jsonError);
-            console.error('[LM-STUDIO] Response text:', text);
 
-            // Fallback for non-JSON responses (if model ignored instructions)
-            // We put the whole text into summary
+        try {
+            analysis = JSON.parse(visionText);
+        } catch (e) {
+            console.warn('[LM-STUDIO] Failed to parse JSON, using fallback.', e);
             analysis = {
-                summary: text,
+                summary: visionText,
                 objects: [],
                 tags: [],
                 scene_type: 'unknown',
@@ -330,6 +324,80 @@ Do not include markdown formatting or explanations.`;
             analysis.tags = analysis.tags.filter(
                 tag => !objectsLower.includes(tag.toLowerCase())
             );
+        }
+
+        // 2. Optional: Second Pass - AI Refinement / Style Transformation
+        // Using the same model (assuming it has text capabilities, which Qwen-VL does)
+        if (options?.style && prompts.styles && prompts.styles[options.style]) {
+            console.log(`[LM-STUDIO] Applying style transformation: ${options.style}`);
+
+            const styleDef = prompts.styles[options.style];
+            const stylePrompt = typeof styleDef === 'string' ? styleDef : styleDef.system_prompt;
+
+            const stylePayload = {
+                model: currentModel,
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a professional creative writer and editor."
+                    },
+                    {
+                        role: "user",
+                        content: `${stylePrompt}\n\nOriginal Description:\n"${analysis.summary}"`
+                    }
+                ],
+                temperature: 0.8,
+                max_tokens: 2000
+            };
+
+            try {
+                const styleRes = await fetch(LM_STUDIO_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(stylePayload)
+                });
+
+                if (styleRes.ok) {
+                    const styleJson = await styleRes.json();
+                    analysis.styled_content = styleJson.choices[0].message.content.trim();
+                }
+            } catch (err) {
+                console.error('[LM-STUDIO] Style transformation failed:', err);
+            }
+        }
+
+        // 3. Optional: Consistency Check
+        if (options?.refinement && prompts.refinements && prompts.refinements[options.refinement]) {
+            console.log(`[LM-STUDIO] Running refinement check: ${options.refinement}`);
+
+            const refinePrompt = prompts.refinements[options.refinement];
+
+            const refinePayload = {
+                model: currentModel,
+                messages: [
+                    { role: "system", content: "You are a logic enforcement engine." },
+                    {
+                        role: "user",
+                        content: `${refinePrompt}\n\nAnalyzed Content:\n"${analysis.summary}"`
+                    }
+                ],
+                temperature: 0.1
+            };
+
+            try {
+                const refineRes = await fetch(LM_STUDIO_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(refinePayload)
+                });
+
+                if (refineRes.ok) {
+                    const refineJson = await refineRes.json();
+                    analysis.consistency_check = refineJson.choices[0].message.content.trim();
+                }
+            } catch (err) {
+                console.error('[LM-STUDIO] Refinement check failed:', err);
+            }
         }
 
         console.log('[LM-STUDIO] Analysis complete:', analysis.summary?.substring(0, 50) + '...');
@@ -509,28 +577,101 @@ export const checkLMStudioConnection = async (): Promise<boolean> => {
 };
 
 /**
- * Gets the currently loaded model ID from LM Studio.
+/**
+ * ============================================================================
+ * TUTORIAL: DYNAMIC MODEL DISCOVERY VIA LM STUDIO API
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * Queries LM Studio's `/v1/models` endpoint to discover which model is currently loaded
+ * in active GPU/CPU memory on localhost:1234.
+ * 
+ * WHY DYNAMIC DISCOVERY IS BETTER THAN A HARDCODED MODEL STRING:
+ * In LM Studio, users frequently switch between different vision models
+ * (e.g. "qwen2.5-vl-7b-instruct", "qwen3-vl-8b", "llava-v1.6-34b").
+ * If the application sent completions requests with a hardcoded model identifier,
+ * LM Studio would reject the request with a 404/400 "Model Not Loaded" error.
+ * By querying `/v1/models` first, we automatically bind to whatever vision model
+ * the user has booted in the LM Studio GUI!
  */
-async function getCurrentModel(): Promise<string> {
+export async function getCurrentModel(): Promise<string> {
     try {
-        const response = await fetch(LM_STUDIO_URL.replace('/chat/completions', '/models'), {
+        const modelsApiEndpointUrl = LM_STUDIO_URL.replace('/chat/completions', '/models');
+        const response = await fetch(modelsApiEndpointUrl, {
             method: 'GET',
-            signal: AbortSignal.timeout(3000)
+            signal: AbortSignal.timeout(3000) // Fast 3-second timeout
         });
 
         if (response.ok) {
-            const data = await response.json();
-            // LM Studio usually returns the loaded model as the first item or specifically active
-            if (data.data && data.data.length > 0) {
-                const modelId = data.data[0].id;
-                console.log(`[LM-STUDIO] Using model: ${modelId}`);
-                return modelId;
+            const parsedModelsResponse = await response.json();
+            // LM Studio returns an array of loaded models under data: [{ id: "...", ... }]
+            if (parsedModelsResponse.data && parsedModelsResponse.data.length > 0) {
+                const activeLoadedModelId = parsedModelsResponse.data[0].id;
+                console.log(`[LM-STUDIO] Dynamically discovered active model: ${activeLoadedModelId}`);
+                return activeLoadedModelId;
             }
         }
-    } catch (e) {
-        console.warn('[LM-STUDIO] Failed to fetch current model, using fallback');
+    } catch (discoveryError) {
+        console.warn('[LM-STUDIO] Dynamic model discovery failed; falling back to "local-model":', discoveryError);
     }
-    return "local-model"; // Fallback
+    return "local-model"; // Fallback identifier accepted by LM Studio
+}
+
+/**
+ * ============================================================================
+ * TUTORIAL: LOW-LEVEL MULTIMODAL CHAT COMPLETION CLIENT
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * Sends an OpenAI-compatible POST request to LM Studio's `/v1/chat/completions` endpoint
+ * with support for arbitrary multimodal message payloads (interleaved text and base64 images).
+ * 
+ * WHY WE DIRECTLY FETCH INSTEAD OF USING A HEAVY NPM CLIENT LIBRARY:
+ * Electron's main process runs in Node 18+, where native `fetch()` is built-in.
+ * By using native `fetch()` rather than the bulky `openai` npm package, we:
+ * 1. Eliminate heavy node_modules dependencies.
+ * 2. Avoid version conflicts with Node's native HTTP stream implementations.
+ * 3. Have complete, unconstrained control over raw payload structure and timeouts.
+ * 
+ * @param conversationMessagesArray - Array of OpenAI-format messages [{ role: "system"|"user", content: [...] }]
+ * @param samplingTemperature - Creativity parameter (0.0 to 1.0; low values like 0.2-0.4 ensure deterministic JSON output)
+ * @param maximumGenerationTokens - Max output tokens for the response text
+ * @returns Promise resolving to the model's generated text response
+ */
+export async function callLMStudioChat(
+    conversationMessagesArray: any[],
+    samplingTemperature = 0.4,
+    maximumGenerationTokens = 4096
+): Promise<string> {
+    const currentlyActiveModelIdentifier = await getCurrentModel();
+
+    const completionResponse = await fetch(LM_STUDIO_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            model: currentlyActiveModelIdentifier,
+            messages: conversationMessagesArray,
+            temperature: samplingTemperature,
+            max_tokens: maximumGenerationTokens,
+        }),
+    });
+
+    if (!completionResponse.ok) {
+        const errorResponseBodyText = await completionResponse.text().catch(() => '');
+        throw new Error(
+            `LM Studio API Error (HTTP ${completionResponse.status}): ` +
+            `${errorResponseBodyText || completionResponse.statusText}`
+        );
+    }
+
+    const completionResponseBodyJson = await completionResponse.json();
+    const generatedMessageTextContent = completionResponseBodyJson?.choices?.[0]?.message?.content;
+
+    if (typeof generatedMessageTextContent !== 'string') {
+        throw new Error('LM Studio returned empty or malformed message content in choice[0]');
+    }
+
+    return generatedMessageTextContent;
 }
 
 // ============================================================================

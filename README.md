@@ -24,6 +24,28 @@ A desktop application that breaks down video clips into important visual compone
 - **Analysis Progress Feedback**: A real-time timer provides a life signal during long AI analyses.
 - **Export to JSON**: Save analysis data, comparison results, or full story timelines
 
+### ⚡ Smart Storyboard Extractor (Autonomous Agentic Mode)
+An intelligent, autonomous video understanding pipeline powered by local Vision-Language Models (e.g., `qwen/qwen3-vl-8b`, `qwen2.5-vl-7b`) running via LM Studio. Instead of processing an entire video at a fixed frame rate, the agent autonomously discovers turning points, zooms into sub-second moments, and writes high-fidelity image prompts.
+
+- **Phase A — Macro Turning Point Scan (Coarse Pass)**:
+  - Divides video into 16 evenly-spaced midpoint intervals and extracts lightweight frames downscaled to $640\times360$.
+  - Evaluates the whole video in a single inference call along with optional spoken dialogue from an attached SubRip (`.srt`) subtitle file (e.g. from ComfyUI + Qwen ASR).
+  - Proposes up to $N$ key dramatic beats (Setup, Conflict Escalation, Dramatic Climax, Resolution).
+- **Phase B — Temporal Refinement & Sub-Second Zoom**:
+  - Slices a high-density temporal window ($\pm 3$ seconds at 4 FPS) around each candidate turning point.
+  - Injects localized spoken dialogue ($\pm 8$ seconds around the candidate moment) without bloating the context with unrelated scenes.
+  - The model selects the exact peak frame using integer **frame-index grounding** (`{"frameIndex": 3}`), or requests a narrower sub-second zoom (`{"action": "zoom", "start_sec": ..., "end_sec": ...}`).
+  - Bounded by strict global safety budgets to guarantee predictable, crash-free execution on local 16GB VRAM GPUs.
+- **Phase C — High-Fidelity Prompt Synthesis**:
+  - Extracts a single uncompressed, full-resolution frame at the winning timestamp.
+  - Automatically passes the frame to `analyzeFrame()` using your selected prompt preset from `qwen_vl3_prompts.json` (e.g., *Ultra Cinematic Detailed*, *Tags*, *Simple Description*).
+  - Enriches the storyboard timeline with visual analysis, scene types, tags, narrative rationale, and generative AI prompt tokens.
+- **Token & VRAM Hygiene (MyClaw Playbook Architecture)**:
+  - **Prefix KV-Cache Locking**: Shared static system prompt prefix (`AGENT_SYSTEM_PROMPT_PREFIX`) enables `llama.cpp` / LM Studio to reuse prompt KV tensors across calls, eliminating prompt reprocessing latency.
+  - **Context Isolation**: Every candidate turning point runs in a fresh, isolated conversation session. Intermediate exploration frames are discarded immediately after pinpointing rather than accumulating across turns.
+  - **Localized Dialogue Windowing**: Restricts transcript injection to $\pm 8\text{s}$ around each candidate beat, avoiding multi-thousand token dialogue leaks.
+  - **Resolution Downscaling**: Exploration frames are bounded to $640\times360$ (~300 vision tokens/frame), reserving full-resolution tokens solely for the final winning frames.
+
 ### AI Analysis Output
 Each analyzed frame includes:
 - **Summary**: Concise description of frame content
@@ -120,6 +142,14 @@ If you previously used the Transformers.js version, you can reclaim several GBs 
 
 ```bash
 npm run dev
+```
+
+### Running Unit Tests
+
+The project includes an official unit test suite (21 tests across 3 suites) covering subtitle parsing, localized dialogue windowing, resilient prompt tool parsing, float timestamp fallbacks, and VRAM budget boundaries. It runs directly via Node.js v25 native test runner without any external test runner dependencies:
+
+```bash
+npm test
 ```
 
 ### Build
@@ -295,3 +325,26 @@ MIT
 > - JSON key_entities → Subject Definitions (Costume, appearance, lighting)
 > - JSON uncertainty → Visual Ambiguity (Shadows, blur, distance)
 > - JSON sound → Atmospheric Description
+
+---
+
+LTX2 Ultra-Detailed Cinematic System Prompt:
+
+Role: You are an expert AI Cinematographer and LTX2 Prompt Engineer. Your goal is to convert concepts into a single, flowing narrative paragraph (10 to 16 sentences) that is rigorously optimized for the LTX2 video generation model.
+Output Rules (Strict Adherence Required):
+1. Format & Structure:
+    ◦ Write ONE continuous paragraph only. Do not use bullet points, lists, or line breaks, as these confuse the model’s temporal understanding.
+    ◦ Use Present-Tense Action Verbs exclusively (e.g., "glides," "reflects," "adjusts" instead of "is standing" or "was walking") to ensure immediate motion.
+    ◦ Maintain a length of 180 to 320 words (10-16 sentences) to allow for the requested depth of detail while maintaining the cohesion required by LTX2.
+2. Visual Micro-Detail:
+    ◦ Subject Details: Describe materials and textures explicitly (e.g., "worn leather," "rough stone," "frayed denim"). Note specific signs of wear, patina, and surface reflectivity.
+    ◦ Human Details: If people are present, specify skin texture/pores, hair movement, fabric weight, and fit. Avoid abstract emotions; use physical cues (e.g., instead of "he is sad," write "his shoulders slump and a tear trails down his cheek").
+    ◦ Lighting Analysis: define the Key, Fill, and Back light. Describe the direction, softness, highlight roll-off, and the shape of the shadows cast.
+3. Cinematic Mechanics:
+    ◦ Explicit Camera Behavior: You must direct the camera. Use specific terms like "tracks," "pushes in," "pans," "tilts up," or "rack focus." Describe how the perspective shifts relative to the subject.
+    ◦ Composition: Describe leading lines, negative space, and depth of field (e.g., "shallow depth of field blurs the neon signage in the background").
+    ◦ Temporal Flow: Use connectors like "as," "while," "then," and "suddenly" to ensure actions flow logically into one another without static pauses.
+4. Audio & Atmosphere:
+    ◦ Audio Integration: Do not list sounds separately. Weave auditory descriptions directly into the narrative (e.g., "the low hum of machinery vibrates through the floor," "rain drums rhythmically against the glass").
+    ◦ Dialogue: If a character speaks, place the text inside double quotation marks.
+Input Data: [Insert your scene concept, image description, or raw ideas here]

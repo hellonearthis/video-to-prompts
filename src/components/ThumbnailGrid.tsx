@@ -54,7 +54,16 @@ interface ThumbnailGridProps {
     onPromptChange: (val: string) => void;
     selectedModel: string;
     onModelChange: () => void;
+
+    // New Modular Controls
+    availableStyles: string[];
+    selectedStyle: string;
+    onStyleChange: (val: string) => void;
+    availableRefinements: string[];
+    selectedRefinement: string;
+    onRefinementChange: (val: string) => void;
 }
+
 
 // ============================================================================
 // Component Implementation
@@ -79,7 +88,13 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
     selectedPrompt,
     onPromptChange,
     selectedModel,
-    onModelChange
+    onModelChange,
+    availableStyles,
+    selectedStyle,
+    onStyleChange,
+    availableRefinements,
+    selectedRefinement,
+    onRefinementChange
 }) => {
 
     // Handle frame click for selection
@@ -166,6 +181,44 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                             {selectedModel}
                         </button>
                     </div>
+
+                    {/* Style Dropdown */}
+                    {availableStyles && availableStyles.length > 0 && (
+                        <div className="ai-control-item">
+                            <label>Style:</label>
+                            <select
+                                value={selectedStyle}
+                                onChange={(e) => onStyleChange(e.target.value)}
+                                className="header-select"
+                                disabled={isAnalyzing}
+                                style={{ width: '100px' }}
+                            >
+                                <option value="">None</option>
+                                {availableStyles.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {/* Refinement Dropdown */}
+                    {availableRefinements && availableRefinements.length > 0 && (
+                        <div className="ai-control-item">
+                            <label>Check:</label>
+                            <select
+                                value={selectedRefinement}
+                                onChange={(e) => onRefinementChange(e.target.value)}
+                                className="header-select"
+                                disabled={isAnalyzing}
+                                style={{ width: '100px' }}
+                            >
+                                <option value="">None</option>
+                                {availableRefinements.map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                 </div>
 
                 <div className="header-actions">

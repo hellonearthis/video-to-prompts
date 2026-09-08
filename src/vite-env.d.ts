@@ -104,9 +104,9 @@ interface Window {
         saveFramesData: (outputDir: string, data: any[]) => Promise<{ success: boolean; error?: string }>;
         loadFramesData: (outputDir: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
         checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
-        getAvailablePrompts: () => Promise<{ prompts: string[] }>;
+        getAvailablePrompts: () => Promise<{ prompts: string[]; styles?: string[]; refinements?: string[]; logs?: string[] }>;
         initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;
-        analyzeFrame: (imagePath: string, promptType?: string, videoPath?: string, timestamp?: number) => Promise<AnalysisResult>;
+        analyzeFrame: (imagePath: string, promptType?: string, videoPath?: string, timestamp?: number, options?: { style?: string, refinement?: string }) => Promise<AnalysisResult>;
         analyzeFramesBatch: (batchData: { path: string, videoPath?: string, time?: number }[], promptType?: string) => Promise<any>;
         compareFrames: (f1: string, f2: string) => Promise<any>;
         compareSequential: (paths: string[]) => Promise<{ success: boolean; results?: any[]; error?: string }>;
@@ -120,5 +120,15 @@ interface Window {
         saveRecentProject: (projectData: { path: string; name: string }) => Promise<{ success: boolean; error?: string }>;
         on: (channel: string, listener: (event: any, ...args: any[]) => void) => () => void;
         off: (channel: string, listener: (event: any, ...args: any[]) => void) => void;
+        getPathForFile: (file: File) => string;
+        selectTranscriptFile: () => Promise<string | null>;
+        extractAgenticStoryboard: (options: {
+            videoPath: string;
+            outputDir: string;
+            transcriptPath?: string | null;
+            maxCandidates?: number;
+            promptType?: string;
+        }) => Promise<{ success: boolean; entries?: any[]; error?: string }>;
     }
 }
+

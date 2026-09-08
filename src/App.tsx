@@ -18,6 +18,7 @@ import { StoryboardView, SceneAnalysis } from './components/StoryboardView';
 import { TimelineStrip } from './components/TimelineStrip';
 import { FullStoryboardView } from './components/FullStoryboardView';
 import { NavBar } from './components/NavBar';
+import { SmartStoryboardModal, StoryboardEntry } from './components/SmartStoryboardModal';
 
 /**
  * Video metadata type (matches VideoInfo from backend)
@@ -109,9 +110,16 @@ function App() {
   // Prompt Management
   const [availablePrompts, setAvailablePrompts] = useState<string[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<string>('Default');
+  const [availableStyles, setAvailableStyles] = useState<string[]>([]);
+  const [selectedStyle, setSelectedStyle] = useState<string>('');
+  const [availableRefinements, setAvailableRefinements] = useState<string[]>([]);
+  const [selectedRefinement, setSelectedRefinement] = useState<string>('');
 
   /** Recent projects from history.json */
   const [recentProjects, setRecentProjects] = useState<any[]>([]);
+
+  /** Smart Storyboard (Agentic Extractor) modal open state */
+  const [isSmartStoryboardOpen, setIsSmartStoryboardOpen] = useState(false);
 
   useEffect(() => {
     // Fetch recent projects history
@@ -128,10 +136,13 @@ function App() {
     // Fetch available prompts
     window.ipcRenderer.getAvailablePrompts().then((result: any) => {
       console.log('[PROMPTS] Backend Search Diagnostics:', result.logs);
-      if (result && result.prompts) {
+      if (result) {
         console.log('[PROMPTS] Available prompts:', result.prompts);
-        setAvailablePrompts(result.prompts);
-        if (result.prompts.length > 0) {
+        setAvailablePrompts(result.prompts || []);
+        setAvailableStyles(result.styles || []);
+        setAvailableRefinements(result.refinements || []);
+
+        if (result.prompts && result.prompts.length > 0) {
           setSelectedPrompt(result.prompts[0]);
         }
       }
@@ -430,7 +441,8 @@ function App() {
             frame.path,
             selectedPrompt, // Use the UI-selected prompt instead of hardcoded string
             filePath || undefined,
-            frame.time
+            frame.time,
+            { style: selectedStyle, refinement: selectedRefinement }
           );
 
           if (result.success && result.analysis) {
@@ -625,6 +637,51 @@ function App() {
     }
   };
 
+  /**
+   * Applies autonomous Smart Storyboard results to the timeline.
+   */
+  const handleApplySmartStoryboard = (entries: StoryboardEntry[]) => {
+    if (!entries || entries.length === 0) return;
+
+    const sceneId = `agent_scene_${Date.now()}`;
+    const framePaths = entries.map(e => e.framePath);
+
+    const sceneAnalysis: SceneAnalysis = {
+      scene_id: sceneId,
+      summary: {
+        what_happened: entries.map((e, idx) => `[Beat ${idx + 1}] ${e.reason}`).join('. '),
+        change: 'Autonomous agent sequence of key dramatic turning points.',
+        implied: 'Inferred between turning points.',
+        uncertainty: 'None reported.',
+      },
+      key_entities: [],
+      story_signals: {
+        importance: 9,
+        agency: 'Key Action',
+        irreversible: true,
+        emotional_shift: { from: 'Setup', to: 'Climax' },
+      },
+      panel_guidance: {
+        panel_count: entries.length,
+        panel_roles: entries.map((_, i) => `Beat ${i + 1}`),
+        omit_literal_action: false,
+        panels: entries.map((e, idx) => ({
+          panel_index: idx,
+          role: `Beat ${idx + 1} (${e.timestampSec.toFixed(1)}s)`,
+          description: e.reason,
+          visual_detail: e.promptText || e.description,
+          best_frame_index: idx,
+        })),
+      },
+      confidence: 0.95,
+      frames: framePaths,
+      timestamp: new Date().toISOString(),
+    };
+
+    handleSaveToTimeline(sceneAnalysis);
+    setCurrentView('storyboard');
+  };
+
 
 
   // ============================================================================
@@ -661,6 +718,7 @@ function App() {
         onViewChange={setCurrentView}
         fileName={filePath?.split(/[/\\]/).pop()}
         hasTimelineItems={storyTimeline.length > 0}
+        onOpenSmartStoryboard={() => setIsSmartStoryboardOpen(true)}
       />
       {/* Main Content */}
       {!filePath ? (
@@ -773,6 +831,12 @@ function App() {
               onPromptChange={setSelectedPrompt}
               selectedModel={aiStatusMessage === 'LM Studio Connected' ? 'LM Studio' : 'Not Connected'}
               onModelChange={handleModelChange}
+              availableStyles={availableStyles}
+              selectedStyle={selectedStyle}
+              onStyleChange={setSelectedStyle}
+              availableRefinements={availableRefinements}
+              selectedRefinement={selectedRefinement}
+              onRefinementChange={setSelectedRefinement}
             />
           </div>
 
@@ -796,6 +860,20 @@ function App() {
             onAnalysisComplete={handleAnalysisComplete}
             timeline={storyTimeline}
           />
+
+          {/* Smart Storyboard Modal */}
+          {filePath && (
+            <SmartStoryboardModal
+              isOpen={isSmartStoryboardOpen}
+              onClose={() => setIsSmartStoryboardOpen(false)}
+              videoPath={filePath}
+              outputDir={filePath + '_extracted'}
+              videoDuration={videoInfo?.duration || 0}
+              availablePrompts={availablePrompts}
+              selectedPromptPreset={selectedPrompt}
+              onApplyToTimeline={handleApplySmartStoryboard}
+            />
+          )}
         </>
       )}
 
