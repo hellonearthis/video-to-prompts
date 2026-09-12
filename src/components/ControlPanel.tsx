@@ -34,6 +34,11 @@ interface ControlPanelProps {
     /** Callback to toggle scene change extraction */
     setExtractSceneChanges: (val: boolean) => void;
 
+    /** Whether Reelbench-style 15%/85% dual shot pair extraction is enabled */
+    extractDualShotPairs?: boolean;
+    /** Callback to toggle dual shot pair extraction */
+    setExtractDualShotPairs?: (val: boolean) => void;
+
     /** Callback triggered when Run Extraction button is clicked */
     onRunExtraction: () => void;
 
@@ -56,6 +61,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     setExtractKeyframes,
     extractSceneChanges,
     setExtractSceneChanges,
+    extractDualShotPairs = false,
+    setExtractDualShotPairs,
     onRunExtraction,
     isProcessing
 }) => {
@@ -133,6 +140,16 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
                     />
                     Scene Changes
                 </label>
+
+                <label className="checkbox-label" title="Extract 15% Start (a) and 85% End (b) keyframe pairs per scene (Reelbench method for camera motion & action flow)">
+                    <input
+                        type="checkbox"
+                        checked={extractDualShotPairs}
+                        onChange={(e) => setExtractDualShotPairs && setExtractDualShotPairs(e.target.checked)}
+                        disabled={isProcessing}
+                    />
+                    Dual-Frame (15%/85% A/B)
+                </label>
             </div>
 
             {/* --------------------------------------------------------------------------
@@ -141,7 +158,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             <div className="action-group">
                 <button
                     onClick={onRunExtraction}
-                    disabled={isProcessing || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges)}
+                    disabled={isProcessing || (!extractTimeFrames && !extractKeyframes && !extractSceneChanges && !extractDualShotPairs)}
                     className="btn-run-extraction"
                 >
                     {isProcessing ? 'Extracting...' : 'Run Extraction'}

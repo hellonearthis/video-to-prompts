@@ -682,4 +682,234 @@ export const extractWindowFrames = async (
     }
 
     return windowExtractedFrameList;
+};
+
+/**
+ * ============================================================================
+ * TUTORIAL: DUAL-FRAME SHOT PAIR EXTRACTION (REELBENCH 15% / 85% ARCHITECTURE)
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * For a given video shot with known temporal boundaries [startTimeSeconds, endTimeSeconds],
+ * this module calculates two stable internal keyframe positions:
+ * - Frame A (Establishing composition) at exactly 15% into the shot duration.
+ * - Frame B (Resolution composition) at exactly 85% into the shot duration.
+ * 
+ * WHY 15% AND 85% (AND NOT 0% AND 100%):
+ * 1. Cut Boundary Isolation:
+ *    At 0% (the start boundary), video codecs often display flash artifacts, residual
+ *    inter-frame compression artifacts from the prior shot, or active dissolve transitions.
+ *    At 100% (the end boundary), the video is frequently already cross-fading or wiping.
+ * 2. Kinematic Vector Determination:
+ *    By comparing a stable establishing frame (15%) against the concluding resolution frame (85%),
+ *    a vision-language model can unambiguously deduce camera trajectory (push-in, pan, tilt, tracking)
+ *    and subject blocking without being misled by cut transition noise.
+ */
+
+export interface ShotPairData {
+    shotIndex: number;
+    shotIdentifier: string;
+    startTimeSeconds: number;
+    endTimeSeconds: number;
+    durationSeconds: number;
+    frameAPath: string;
+    frameATimestamp: number;
+    frameBPath: string;
+    frameBTimestamp: number;
+}
+
+export interface DualShotFrameItem {
+    path: string;
+    type: 'scene_dual';
+    frame: number;
+    time: number;
+    shotIdentifier: string;
+    pairRole: 'start_15' | 'end_85';
+    shotStartTime: number;
+    shotEndTime: number;
+    partnerPath?: string;
+}
+
+/**
+ * Extracts the 15% establishing frame and 85% resolution frame for an individual shot.
+ */
+export const extractShotPairFrames = async (
+    videoFilePath: string,
+    shotStartTimeSeconds: number,
+    shotEndTimeSeconds: number,
+    outputDestinationDirectory: string,
+    shotIdentifierString: string,
+    maximumBoundingWidth = 640,
+    maximumBoundingHeight = 360
+): Promise<{
+    frameAPath: string;
+    frameATimestamp: number;
+    frameBPath: string;
+    frameBTimestamp: number;
+}> => {
+    const totalShotDurationSeconds = Math.max(0.1, shotEndTimeSeconds - shotStartTimeSeconds);
+
+    // WHAT: Calculate 15% establishing timestamp and 85% resolution timestamp
+    // WHY: Avoids boundary transition artifacts while maximizing kinematic delta
+    const establishingTimestampA = shotStartTimeSeconds + totalShotDurationSeconds * 0.15;
+    const resolutionTimestampB = shotStartTimeSeconds + totalShotDurationSeconds * 0.85;
+
+    if (!fs.existsSync(outputDestinationDirectory)) {
+        fs.mkdirSync(outputDestinationDirectory, { recursive: true });
+    }
+
+    const sanitizedTimestampStringA = establishingTimestampA.toFixed(2).replace('.', '_');
+    const sanitizedTimestampStringB = resolutionTimestampB.toFixed(2).replace('.', '_');
+
+    const outputFilenameA = `${shotIdentifierString}_a_${sanitizedTimestampStringA}s.png`;
+    const outputFilenameB = `${shotIdentifierString}_b_${sanitizedTimestampStringB}s.png`;
+
+    const fullPathA = path.join(outputDestinationDirectory, outputFilenameA);
+    const fullPathB = path.join(outputDestinationDirectory, outputFilenameB);
+
+    await extractScaledFrameAtTime(
+        videoFilePath,
+        establishingTimestampA,
+        fullPathA,
+        maximumBoundingWidth,
+        maximumBoundingHeight
+    );
+
+    await extractScaledFrameAtTime(
+        videoFilePath,
+        resolutionTimestampB,
+        fullPathB,
+        maximumBoundingWidth,
+        maximumBoundingHeight
+    );
+
+    return {
+        frameAPath: fullPathA,
+        frameATimestamp: establishingTimestampA,
+        frameBPath: fullPathB,
+        frameBTimestamp: resolutionTimestampB
+    };
+};
+
+/**
+ * ============================================================================
+ * TUTORIAL: COMPLETE SCENE SHOT PAIR DETECTION & EXTRACTION PIPELINE
+ * ============================================================================
+ * 
+ * WHAT THIS DOES:
+ * 1. Detects exact scene transitions across the entire video using FFmpeg select='gt(scene,T)'
+ * 2. Groups timestamps into discrete shots [0 -> cut1 -> cut2 ... -> duration]
+ * 3. Merges micro-noise (<0.3s fragments from flash cuts or subtitle jumps)
+ * 4. Extracts paired 15% (establishing) and 85% (resolution) frames for each detected shot
+ */
+export const extractSceneShotPairs = async ({
+    filePath,
+    outputDir,
+    threshold = 0.3
+}: ExtractionOptions): Promise<ShotPairData[]> => {
+    const videoMetadata = await getVideoInfo(filePath);
+    const totalVideoDurationSeconds = videoMetadata.duration || 1;
+
+    // Phase 1: Fast cut point discovery using FFmpeg metadata filter
+    const detectedCutPointsSecondsArray = await new Promise<number[]>((resolveCutDetection, rejectCutDetection) => {
+        const cutTimestampList: number[] = [];
+
+        // WHAT: Run FFmpeg with scale=320:-2 and metadata output to stdout/stderr with null sink
+        // WHY: Detecting scene cuts on downscaled frames without encoding PNGs is 10x faster than writing disk files
+        const ffmpegSceneArgumentsArray = [
+            '-i', filePath,
+            '-an',
+            '-vf', `scale=320:-2,select='gt(scene,${threshold})',metadata=print:file=-`,
+            '-f', 'null',
+            '-'
+        ];
+
+        console.log('[FFMPEG-SHOTS] Running cut detection with threshold:', threshold);
+        const sceneDetectionProcess = spawn(getFfmpegPath(), ffmpegSceneArgumentsArray);
+
+        sceneDetectionProcess.stderr.on('data', (standardErrorChunk) => {
+            const outputLinesArray = standardErrorChunk.toString().split('\n');
+            for (const singleOutputLine of outputLinesArray) {
+                const timestampMatch = singleOutputLine.match(/pts_time:([\d.]+)/);
+                if (timestampMatch) {
+                    const parsedTimestampSeconds = parseFloat(timestampMatch[1]);
+                    if (!isNaN(parsedTimestampSeconds) && parsedTimestampSeconds > 0 && parsedTimestampSeconds < totalVideoDurationSeconds) {
+                        cutTimestampList.push(Math.round(parsedTimestampSeconds * 100) / 100);
+                    }
+                }
+            }
+        });
+
+        sceneDetectionProcess.on('close', (processExitCode) => {
+            if (processExitCode === 0) {
+                const deduplicatedSortedCuts = Array.from(new Set(cutTimestampList)).sort((a, b) => a - b);
+                resolveCutDetection(deduplicatedSortedCuts);
+            } else {
+                rejectCutDetection(new Error(`Scene cut detection failed with exit code ${processExitCode}`));
+            }
+        });
+
+        sceneDetectionProcess.on('error', (spawnError) => {
+            rejectCutDetection(spawnError);
+        });
+    });
+
+    // Phase 2: Construct continuous shot boundaries and merge sub-0.3s noise fragments
+    const minimumAllowedShotDurationSeconds = 0.3;
+    const continuousBoundaryTimestampsArray: number[] = [0];
+
+    for (const rawCutTimestampSeconds of detectedCutPointsSecondsArray) {
+        const previousBoundarySeconds = continuousBoundaryTimestampsArray[continuousBoundaryTimestampsArray.length - 1];
+        if (rawCutTimestampSeconds - previousBoundarySeconds >= minimumAllowedShotDurationSeconds) {
+            continuousBoundaryTimestampsArray.push(rawCutTimestampSeconds);
+        }
+    }
+
+    const lastBoundaryTimestampSeconds = continuousBoundaryTimestampsArray[continuousBoundaryTimestampsArray.length - 1];
+    if (totalVideoDurationSeconds - lastBoundaryTimestampSeconds < minimumAllowedShotDurationSeconds && continuousBoundaryTimestampsArray.length > 1) {
+        continuousBoundaryTimestampsArray.pop();
+    }
+    continuousBoundaryTimestampsArray.push(Math.round(totalVideoDurationSeconds * 100) / 100);
+
+    // Phase 3: Extract the 15% and 85% frame pair for each shot
+    const shotsDestinationDirectory = path.join(outputDir, 'shot_pairs');
+    if (!fs.existsSync(shotsDestinationDirectory)) {
+        fs.mkdirSync(shotsDestinationDirectory, { recursive: true });
+    }
+
+    const completedShotPairsResultList: ShotPairData[] = [];
+
+    for (let shotIndex = 0; shotIndex < continuousBoundaryTimestampsArray.length - 1; shotIndex++) {
+        const shotStartTimeSeconds = continuousBoundaryTimestampsArray[shotIndex];
+        const shotEndTimeSeconds = continuousBoundaryTimestampsArray[shotIndex + 1];
+        const shotDurationSeconds = Math.round((shotEndTimeSeconds - shotStartTimeSeconds) * 100) / 100;
+        const shotIdentifierString = `S${String(shotIndex + 1).padStart(2, '0')}`;
+
+        try {
+            const pairExtractionResult = await extractShotPairFrames(
+                filePath,
+                shotStartTimeSeconds,
+                shotEndTimeSeconds,
+                shotsDestinationDirectory,
+                shotIdentifierString
+            );
+
+            completedShotPairsResultList.push({
+                shotIndex: shotIndex + 1,
+                shotIdentifier: shotIdentifierString,
+                startTimeSeconds: shotStartTimeSeconds,
+                endTimeSeconds: shotEndTimeSeconds,
+                durationSeconds: shotDurationSeconds,
+                frameAPath: pairExtractionResult.frameAPath,
+                frameATimestamp: pairExtractionResult.frameATimestamp,
+                frameBPath: pairExtractionResult.frameBPath,
+                frameBTimestamp: pairExtractionResult.frameBTimestamp
+            });
+        } catch (extractionError) {
+            console.warn(`[FFMPEG-SHOTS] Failed to extract pair for ${shotIdentifierString}:`, extractionError);
+        }
+    }
+
+    console.log(`[FFMPEG-SHOTS] Successfully extracted ${completedShotPairsResultList.length} dual-frame shot pairs.`);
+    return completedShotPairsResultList;
 };

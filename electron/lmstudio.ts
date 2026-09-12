@@ -46,6 +46,12 @@ export interface FrameAnalysis {
         dominant_colors: string[];
         lighting: string;
     };
+    /** Cinematic pacing role (hook, setup, progression, emphasis, turning-point, payoff, breath, close) */
+    rhythm_role?: string;
+    /** Camera movement type (static, push-in, pull-out, pan-left, tracking, etc.) */
+    camera_movement?: string;
+    /** Shot scale (extreme-wide, wide, medium, close-up, etc.) */
+    shot_scale?: string;
 }
 
 /**
@@ -76,6 +82,12 @@ export interface AnalysisOptions {
 export interface ComparisonResult {
     /** Description of action occurring between frames */
     action_description: string;
+    /** Camera movement between frames (static, push-in, pull-out, pan-left, tracking, etc.) */
+    camera_movement?: string;
+    /** Cinematic narrative rhythm role (hook, setup, progression, emphasis, turning-point, payoff, breath, close) */
+    rhythm_role?: string;
+    /** Shot scale classification (extreme-wide, wide, medium, close-up, etc.) */
+    shot_scale?: string;
     /** Analysis of object movement/flow */
     object_flow: string;
     /** Key differences between start and end state */
@@ -444,13 +456,23 @@ export const compareFrames = async (frame1Path: string, frame2Path: string): Pro
         const img2Base64 = img2Buffer.toString('base64');
         const img2Mime = getMimeType(frame2Path);
 
-        // Build prompt for action analysis
-        const prompt = `You are an expert video analyst. Analyze these two sequential video frames (Start Frame and End Frame).
-Describe the action taking place between them, the flow of objects, and key differences.
+        // WHAT: Asking the vision model to analyze action, camera movement, and pacing rhythm between two frames.
+        // WHY: Adopting Reelbench's taxonomy allows the user to immediately see both the physical camera motion
+        // (e.g. push-in, pan-left, static) and dramatic pacing beat (hook, setup, progression, turning-point, payoff, etc.).
+        const prompt = `You are an expert cinematography and video analyst. Analyze these two sequential video frames (Start Frame and End Frame).
+Describe the action taking place between them, the camera movement, the flow of objects, key differences, and the dramatic pacing beat.
+
+Taxonomy Guidelines:
+- camera_movement: Choose from ["static", "push-in", "pull-out", "pan-left", "pan-right", "tilt-up", "tilt-down", "tracking", "handheld", "whip-pan", "drone"]
+- rhythm_role: Choose from ["hook", "setup", "progression", "emphasis", "turning-point", "payoff", "breath", "close"]
+- shot_scale: Choose from ["extreme-wide", "wide", "medium-wide", "medium", "medium-close", "close-up", "extreme-close-up"]
 
 Return ONLY a JSON object with this exact structure:
 {
   "action_description": "Detailed description of the action occurring between these frames.",
+  "camera_movement": "push-in",
+  "rhythm_role": "progression",
+  "shot_scale": "medium",
   "object_flow": "Description of how objects have moved or changed.",
   "differences": ["List of specific visual differences", "Difference 2"],
   "confidence": 0.9

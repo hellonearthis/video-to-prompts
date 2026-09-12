@@ -66,6 +66,9 @@ function App() {
   /** Whether to extract scene change frames */
   const [doSceneChanges, setDoSceneChanges] = useState(false);
 
+  /** Whether to extract Reelbench-style 15%/85% dual shot pairs */
+  const [doDualShotPairs, setDoDualShotPairs] = useState(false);
+
   // --------------------------------------------------------------------------
   // Loading States
   // --------------------------------------------------------------------------
@@ -327,6 +330,31 @@ function App() {
           time: s.time,
           pts: s.pts
         })));
+      }
+
+      if (doDualShotPairs) {
+        console.log('Extracting Reelbench 15%/85% Dual-Frame Shot Pairs...');
+        const shotPairsData = await window.ipcRenderer.extractSceneShotPairs(filePath, outputDir, sceneDetectionThreshold);
+        for (const shot of shotPairsData) {
+          // Establishing frame at 15% mark
+          newFrames.push({
+            path: shot.frameAPath,
+            type: 'scene_dual' as const,
+            frame: shot.shotIndex,
+            time: shot.frameATimestamp,
+            shotIdentifier: shot.shotIdentifier,
+            pairRole: 'start_15' as const
+          });
+          // Resolution frame at 85% mark
+          newFrames.push({
+            path: shot.frameBPath,
+            type: 'scene_dual' as const,
+            frame: shot.shotIndex,
+            time: shot.frameBTimestamp,
+            shotIdentifier: shot.shotIdentifier,
+            pairRole: 'end_85' as const
+          });
+        }
       }
 
       newFrames.sort((a, b) =>
@@ -804,6 +832,8 @@ function App() {
                 setExtractKeyframes={setDoKeyframes}
                 extractSceneChanges={doSceneChanges}
                 setExtractSceneChanges={setDoSceneChanges}
+                extractDualShotPairs={doDualShotPairs}
+                setExtractDualShotPairs={setDoDualShotPairs}
                 onRunExtraction={handleRunExtraction}
                 isProcessing={isProcessing}
               />

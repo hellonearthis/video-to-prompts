@@ -51,6 +51,9 @@ interface AnalysisProgress {
  */
 interface ComparisonResult {
     action_description: string;
+    camera_movement?: string;
+    rhythm_role?: string;
+    shot_scale?: string;
     object_flow: string;
     differences: string[];
     confidence?: number;
@@ -96,6 +99,17 @@ interface Window {
         extractTimeFrames: (filePath: string, outputDir: string, fps?: number) => Promise<{ path: string; time: number }[]>;
         extractKeyframes: (filePath: string, outputDir: string) => Promise<{ path: string; time: number }[]>;
         extractSceneChanges: (filePath: string, outputDir: string, threshold: number) => Promise<{ path: string; time: number; pts: number; frame: number }[]>;
+        extractSceneShotPairs: (filePath: string, outputDir: string, threshold: number) => Promise<{
+            shotIndex: number;
+            shotIdentifier: string;
+            startTimeSeconds: number;
+            endTimeSeconds: number;
+            durationSeconds: number;
+            frameAPath: string;
+            frameATimestamp: number;
+            frameBPath: string;
+            frameBTimestamp: number;
+        }[]>;
         getVideoInfo: (filePath: string) => Promise<VideoInfo>;
         checkExtractionExists: (outputDir: string) => Promise<{ exists: boolean; hasFrames?: boolean; count?: number; error?: string }>;
         listFrames: (outputDir: string) => Promise<{ success: boolean; frames: string[]; error?: string }>;

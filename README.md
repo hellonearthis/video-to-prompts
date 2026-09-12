@@ -8,10 +8,11 @@ A desktop application that breaks down video clips into important visual compone
 - **Video Import**: Drag-and-drop or file picker for video files (MP4, MOV, AVI, MKV)
 - **Video Metadata**: Display duration, FPS, resolution, codec, and bitrate
 - **Smart Extraction**: Automatically detects existing extraction folders and offers to reuse frames or clear and re-run.
-- **Three Extraction Modes**:
+- **Four Extraction Modes**:
   - **Time Frames**: Regular time intervals (configurable FPS)
   - **Keyframes**: Actual video keyframes (I-frames)
   - **Scene Detection**: Detect and extract frames where significant visual changes occur
+  - **Dual-Frame (15%/85% A/B) Shot Extraction**: Inspired by the Reelbench architecture. Rather than extracting cut boundary frames (which often suffer from flash cuts, dissolve artifacts, or codec noise), this mode discovers continuous shot intervals, filters micro-noise (< 0.3s), and samples paired keyframes at the 15% mark (establishing composition) and 85% mark (resolution composition).
 - **Automatic Image Scaling**: Extracted frames are automatically scaled to a 640x420 (landscape) or 420x640 (portrait) bounding box to optimize AI analysis performance and memory usage.
 
 ### AI-Powered Analysis
@@ -53,9 +54,12 @@ Each analyzed frame includes:
 - **Tags**: Descriptive keywords
 - **Scene Type**: indoor/outdoor/portrait/etc
 - **Visual Elements**: Dominant colors, lighting description
+- **Cinematic Rhythm Role**: Grounded pacing beat classification (Hook, Setup, Progression, Emphasis, Turning Point, Payoff, Breath, Close)
+- **Camera Movement**: Inferred camera trajectory (Static, Push in, Pull out, Pan left/right, Tilt, Tracking, Handheld, Drone)
 
 Frame comparisons include:
 - **Action Description**: What's happening between frames
+- **Camera Movement & Rhythm Role**: Grounded cinematography and pacing classifications
 - **Object Flow**: How objects moved or changed
 - **Differences**: Key visual differences
 
@@ -89,12 +93,14 @@ You can customize the AI analysis behavior by editing the `qwen_vl3_prompts.json
   "_preset_prompts": [
     "Tags",
     "Simple Description",
-    "Ultra Cinematic Detailed"
+    "Ultra Cinematic Detailed",
+    "Cinematic Rhythm & Shot Breakdown"
   ],
   "qwenvl": {
     "Tags": "...",
     "Simple Description": "...",
-    "Ultra Cinematic Detailed": "..."
+    "Ultra Cinematic Detailed": "...",
+    "Cinematic Rhythm & Shot Breakdown": "..."
   }
 }
 ```
@@ -146,7 +152,7 @@ npm run dev
 
 ### Running Unit Tests
 
-The project includes an official unit test suite (21 tests across 3 suites) covering subtitle parsing, localized dialogue windowing, resilient prompt tool parsing, float timestamp fallbacks, and VRAM budget boundaries. It runs directly via Node.js v25 native test runner without any external test runner dependencies:
+The project includes an official unit test suite (23 tests across 4 suites) covering Reelbench 15%/85% sampling math, cinematic rhythm role schemas, subtitle parsing, localized dialogue windowing, resilient prompt tool parsing, float timestamp fallbacks, and VRAM budget boundaries. It runs directly via Node.js native test runner without any external test runner dependencies:
 
 ```bash
 npm test
@@ -184,6 +190,36 @@ npm run build
 9. **Export results**:
    - **"Export JSON"**: Saves all analyzed frame data
    - **"Export to JSON"** (in comparison/story view): Saves specific analysis results
+
+## Model Context Protocol (MCP) & Chrome DevTools
+
+The workspace is configured to integrate with AI agent assistants (such as Antigravity, Claude Code, and Cursor) via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/):
+
+### 1. Workspace Configuration (`.agents/mcp_config.json`)
+The project includes a workspace MCP configuration for [`chrome-devtools-mcp`](https://github.com/ChromeDevTools/chrome-devtools-mcp):
+
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx.cmd",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ]
+    }
+  }
+}
+```
+
+### 2. Available Agent Tools
+- **Page Navigation**: Navigate directly to local dev instances (e.g., `http://localhost:5173`).
+- **DOM & Script Evaluation**: Run JavaScript expressions in the renderer context to inspect state and verify component interactions.
+- **Viewport Screenshots**: Capture real-time UI screenshots into the AI agent context.
+- **Network & Performance**: Inspect network requests and performance traces.
+
+### 3. WebMCP Compatibility
+Architecturally ready for Google Chrome Labs' client-side **WebMCP** specification (`document.modelContext`), allowing web applications to declare declarative AI tool endpoints directly inside browser components.
 
 ## Project Structure
 

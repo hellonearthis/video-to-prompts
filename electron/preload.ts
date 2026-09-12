@@ -141,6 +141,13 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     ipcRenderer.invoke('extract-scene-changes', filePath, outputDir, threshold),
 
   /**
+   * Detects scene cuts and extracts 15% (establishing) and 85% (resolution) dual-frame shot pairs (Reelbench architecture).
+   * Triggers the 'extract-scene-shot-pairs' IPC handler in main.ts.
+   */
+  extractSceneShotPairs: (filePath: string, outputDir: string, threshold: number) =>
+    ipcRenderer.invoke('extract-scene-shot-pairs', filePath, outputDir, threshold),
+
+  /**
    * Gets video metadata using FFprobe.
    * Triggers the 'get-video-info' IPC handler in main.ts.
    * 

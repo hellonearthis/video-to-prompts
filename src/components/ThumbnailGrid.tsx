@@ -7,10 +7,14 @@ import './ThumbnailGrid.css';
 // ... (FrameData and ThumbnailGridProps remain the same)
 export interface FrameData {
     path: string;
-    type: 'time' | 'keyframe' | 'scene';
+    type: 'time' | 'keyframe' | 'scene' | 'scene_dual';
     frame?: number;
     time?: number;
     pts?: number;
+    shotIdentifier?: string;
+    pairRole?: 'start_15' | 'end_85';
+    camera_movement?: string;
+    rhythm_role?: string;
     /** AI-generated summary description */
     description?: string;
     /** AI-detected objects in frame */
@@ -361,7 +365,7 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                             <div className="frame-meta-content">
                                 <div className="meta-header-row">
                                     <span className="frame-timestamp">
-                                        Frame {index + 1} {frame.time !== undefined ? `- ${frame.time.toFixed(2)}s` : ''}
+                                        {frame.shotIdentifier ? `${frame.shotIdentifier}${frame.pairRole === 'start_15' ? 'a (15%)' : 'b (85%)'}` : `Frame ${index + 1}`} {frame.time !== undefined ? `- ${frame.time.toFixed(2)}s` : ''}
                                     </span>
                                 </div>
 
@@ -390,14 +394,24 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                                             </div>
                                         )}
 
-                                        {/* Scene Type */}
-                                        {frame.scene_type && (
-                                            <div>
+                                        {/* Scene Type & Cinematic Rhythm / Camera Badges */}
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                                            {frame.scene_type && (
                                                 <span className="scene-type-badge">
                                                     {frame.scene_type}
                                                 </span>
-                                            </div>
-                                        )}
+                                            )}
+                                            {frame.rhythm_role && (
+                                                <span className="scene-type-badge" style={{ background: '#2e4372', color: '#c9daf8', border: '1px solid #4a70be' }} title="Reelbench Cinematic Pacing Beat">
+                                                    🎵 {frame.rhythm_role}
+                                                </span>
+                                            )}
+                                            {frame.camera_movement && (
+                                                <span className="scene-type-badge" style={{ background: '#254e33', color: '#b7e1cd', border: '1px solid #3e8453' }} title="Camera Movement">
+                                                    📹 {frame.camera_movement}
+                                                </span>
+                                            )}
+                                        </div>
 
                                         {/* Objects */}
                                         {frame.objects && frame.objects.length > 0 && (

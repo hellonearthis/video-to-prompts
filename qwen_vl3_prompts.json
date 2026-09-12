@@ -10,6 +10,7 @@
     "Short Story",
     "Prompt Refine & Expand",
     "Ultra Cinematic Detailed",
+    "Cinematic Rhythm & Shot Breakdown",
     "--- MODULAR PRESETS ---",
     "Modular: Noir Detective",
     "Modular: Sci-Fi World",
@@ -56,6 +57,16 @@
     "mood": {
       "emotional": "What emotional response does the image evoke? (e.g. Melancholy, Joy, Dread, Serenity).",
       "sensory": "Describe implied sensory details based on the visuals: temperature, smell, sound, and humidity."
+    },
+    "rhythm": {
+      "hook": "Identify the high-impact visual or dramatic hook that grabs immediate attention.",
+      "setup": "Analyze the world-building, character premise, and environmental context establishing the shot.",
+      "progression": "Describe how visual tension, movement, or momentum escalates across the frame.",
+      "emphasis": "Identify the decisive dramatic accent, focal punch, or peak visual beat.",
+      "turning_point": "Describe any visual or narrative reversal shifting the direction of the scene.",
+      "payoff": "Detail the climax or dramatic resolution delivered in this composition.",
+      "breath": "Identify the reaction beat, atmospheric easing, or breathing room provided.",
+      "close": "Analyze the resolution, exit framing, or concluding cadence of the visual sequence."
     }
   },
   "presets": {
@@ -96,7 +107,8 @@
     "Video Summary": "Summarize the key events and narrative points in this video.",
     "Short Story": "Write a short, imaginative story inspired by this image or video.",
     "Prompt Refine & Expand": "Refine and enhance the following user prompt for creative text-to-image generation. Keep the meaning and keywords, make it more expressive and visually rich. Output ONLY the improved prompt text (no preface, no bullets, no JSON, no <think>, no commentary).",
-    "Ultra Cinematic Detailed": "Analyze this image with EXTREME focus on visual micro-details. Describe every texture (fabric weave, skin pores, surface weathering), lighting nuance (exact color temperature, shadow fall-off, practical sources), and material quality (reflectivity, roughness). Break down the composition, depth of field, and camera lens characteristics. Output ONE dense, highly descriptive paragraph suitable for high-end generative reproduction. No narrative fluff, just pure visual data."
+    "Ultra Cinematic Detailed": "Analyze this image with EXTREME focus on visual micro-details. Describe every texture (fabric weave, skin pores, surface weathering), lighting nuance (exact color temperature, shadow fall-off, practical sources), and material quality (reflectivity, roughness). Break down the composition, depth of field, and camera lens characteristics. Output ONE dense, highly descriptive paragraph suitable for high-end generative reproduction. No narrative fluff, just pure visual data.",
+    "Cinematic Rhythm & Shot Breakdown": "Analyze this shot using precise cinematographic taxonomy. Identify:\n- Shot Scale: Choose from [Extreme Wide, Wide, Medium Wide, Medium, Medium Close, Close-up, Extreme Close-up].\n- Camera Movement: Choose from [Static, Push in, Pull out, Pan left/right, Tilt up/down, Tracking, Handheld, Whip pan, Drone].\n- Narrative Rhythm Role: Choose from [Hook, Setup, Progression, Emphasis, Turning Point, Payoff, Breath, Close].\n- Visible Content: Write ONE dense, concrete paragraph (4-6 sentences) describing ONLY visible subjects, physical actions, environment, lighting direction, and materials. Do NOT use vague subjective phrases (no 'visually stunning', no 'atmospheric', no 'cinematic vibe') and do NOT open with 'This shot shows...'. No preface, no reasoning, no <think>."
   },
   "qwen_text": {
     "translation_prompt": "You are a professional prompt translator. Return a single English paragraph (150 to 300 words). No prefixes, bullets, JSON, or <think>. Preserve all visual and stylistic details.",

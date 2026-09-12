@@ -15,7 +15,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { extractKeyframes, extractTimeFrames, extractSceneChanges, getVideoInfo, extractSingleHighResFrame } from './ffmpeg'
+import { extractKeyframes, extractTimeFrames, extractSceneChanges, extractSceneShotPairs, getVideoInfo, extractSingleHighResFrame } from './ffmpeg'
 import fs from 'fs/promises'
 import { existsSync } from 'fs'
 import {
@@ -302,6 +302,18 @@ app.whenReady().then(() => {
    */
   ipcMain.handle('extract-scene-changes', async (_, filePath, outputDir, threshold) => {
     return await extractSceneChanges({ filePath, outputDir, threshold })
+  })
+
+  /**
+   * Handle dual-frame (15%/85%) shot pair extraction request (inspired by Reelbench).
+   * 
+   * @param filePath - Path to the input video file
+   * @param outputDir - Directory to save extracted frames
+   * @param threshold - Scene detection sensitivity (0.0-1.0)
+   * @returns Array of ShotPairData objects
+   */
+  ipcMain.handle('extract-scene-shot-pairs', async (_, filePath, outputDir, threshold) => {
+    return await extractSceneShotPairs({ filePath, outputDir, threshold })
   })
 
   /**
