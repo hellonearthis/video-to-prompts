@@ -11,11 +11,19 @@
     "Prompt Refine & Expand",
     "Ultra Cinematic Detailed",
     "Cinematic Rhythm & Shot Breakdown",
+    "Evidence-Based Shot Breakdown",
     "--- MODULAR PRESETS ---",
     "Modular: Noir Detective",
     "Modular: Sci-Fi World",
     "Modular: Studio Portrait",
-    "Modular: Nature Documentary"
+    "Modular: Nature Documentary",
+    "Modular: Screen Recording & UI",
+    "Modular: Procedural Tutorial",
+    "Modular: Narrative Beats",
+    "Modular: Video Accessibility & AD",
+    "Modular: Interview & Dialogue",
+    "Modular: Music & Live Performance",
+    "Modular: Commercial & Persuasion"
   ],
   "styles": {
     "Poetic": "Rewrite the following description as a free-verse poem. Focus on emotion, sensory details, and metaphor. Do not add new visual information.",
@@ -25,7 +33,10 @@
     "Midjourney": "Convert the description into a comma-separated list of keywords and tokens optimized for generative AI (e.g. Midjourney V6). Focus on subject, medium, style, lighting, and composition."
   },
   "refinements": {
-    "Conflict Check": "Analyze the description for logical inconsistencies (e.g., conflicting lighting sources, impossible geometry, anachronisms). If found, list them. If none, verify 'No conflicts found'."
+    "Conflict Check": "Analyze the description for logical inconsistencies (e.g., conflicting lighting sources, impossible geometry, anachronisms). If found, list them. If none, verify 'No conflicts found'.",
+    "Evidence vs Inference": "Analyze the description and enforce strict evidence boundaries: remove mind-reading assumptions (e.g., 'clearly intends', 'obviously', 'is trying to'), separate observed physical facts from inferences, and hedge any uncertain elements with 'appears to' or 'consistent with'.",
+    "Transcript-Visual Alignment": "Compare the visual events in the frame against any provided transcript or audio cues. Identify contradictions, ironic offsets, sarcastic delivery, or instances where the visual action tells a different story than what is spoken.",
+    "Accessibility & Photosensitivity": "Evaluate this frame for visual accessibility: verify on-screen text legibility, contrast ratios against backgrounds, and flag any high-contrast flashing or stroboscopic luminance hazards."
   },
   "modules": {
     "lighting": {
@@ -67,6 +78,47 @@
       "payoff": "Detail the climax or dramatic resolution delivered in this composition.",
       "breath": "Identify the reaction beat, atmospheric easing, or breathing room provided.",
       "close": "Analyze the resolution, exit framing, or concluding cadence of the visual sequence."
+    },
+    "screen_recording": {
+      "ui_state": "Identify platform, app window, active menus, dialogs, buttons, and status indicators.",
+      "user_actions": "Detail chronological user actions visible: mouse clicks, cursor movement, typed text, scrolling, or selection.",
+      "feedback": "Note any loading spinners, tooltips, error alerts, latency indicators, or state transitions."
+    },
+    "procedural": {
+      "steps_order": "List the ordered sequence of demonstrated physical or instructional steps with precise before and after states.",
+      "tools_materials": "Identify all tools, materials, settings, prerequisites, or implements used in the procedure.",
+      "critical_actions": "Pinpoint the decisive actions, techniques, or adjustments that determine the success of the procedure."
+    },
+    "narrative_beats": {
+      "dramatic_conflict": "Identify the primary source of tension or visual conflict between subjects or within the environment.",
+      "turning_point": "Describe the pivotal beat where action, momentum, or character dynamics visibly pivot.",
+      "presentation_choice": "Distinguish between physical story-world events and presentation choices (lighting, framing, editing pace)."
+    },
+    "camera": {
+      "lens": "Estimate focal length (wide angle, telephoto, macro) and aperture (bokeh, depth of field).",
+      "framing": "Analyze composition techniques: rule of thirds, center framing, golden ratio, leading lines.",
+      "shot_type": "Classify camera shot type: cowboy shot, close-up, extreme long shot, Dutch angle.",
+      "angles": "Identify camera elevation and angle: low-angle, high-angle, eye-level, bird's-eye, or canted Dutch angle.",
+      "movement": "Identify camera movement: static, push-in, pull-out, pan, tilt, tracking, handheld, whip-pan, drone."
+    },
+    "accessibility": {
+      "audio_description": "Write a present-tense audio description script describing purely visual actions, settings, and changes designed for visually impaired narration between dialogue pauses.",
+      "visual_alt_text": "Provide a concise, descriptive alt-text summarizing the visual subject and primary action."
+    },
+    "conversational": {
+      "turn_taking": "Analyze speaker turn-taking, active listening cues, gaze direction, and visual attention between participants.",
+      "interpersonal_dynamics": "Identify visual markers of agreement, disagreement, tension, dominance, and rapport."
+    },
+    "performance": {
+      "stage_and_lighting": "Detail stage lighting cues, practical fixtures, spot vs wash, haze, and performers' blocking.",
+      "rhythm_sync": "Analyze visual rhythm: cuts-on-the-beat, choreographic tempo, instrument playing, and physical energy."
+    },
+    "advertising": {
+      "value_prop": "Identify featured products, branding, claimed value, packaging legibility, and demonstrations.",
+      "call_to_action": "Spot calls to action (CTA), promo URLs, pricing overlays, disclaimers, and social proof cues."
+    },
+    "text_ocr": {
+      "on_screen_text": "Quote verbatim all legible on-screen text, note its screen placement (lower-third, header, center, watermark), and distinguish whether it is in-scene (diegetic) or a digital graphic overlay."
     }
   },
   "presets": {
@@ -88,13 +140,52 @@
       "lighting.studio",
       "characters.demographic",
       "characters.emotion",
-      "modules.camera.lens"
+      "camera.lens"
     ],
     "Modular: Nature Documentary": [
       "theme.photorealistic",
       "scene.spatial",
       "lighting.standard",
-      "modules.mood.sensory"
+      "mood.sensory"
+    ],
+    "Modular: Screen Recording & UI": [
+      "screen_recording.ui_state",
+      "screen_recording.user_actions",
+      "theme.photorealistic",
+      "objects.inventory"
+    ],
+    "Modular: Procedural Tutorial": [
+      "procedural.steps_order",
+      "procedural.tools_materials",
+      "procedural.critical_actions",
+      "scene.spatial"
+    ],
+    "Modular: Narrative Beats": [
+      "narrative_beats.dramatic_conflict",
+      "narrative_beats.turning_point",
+      "narrative_beats.presentation_choice",
+      "lighting.cinematic",
+      "rhythm.emphasis"
+    ],
+    "Modular: Video Accessibility & AD": [
+      "accessibility.audio_description",
+      "accessibility.visual_alt_text",
+      "camera.framing"
+    ],
+    "Modular: Interview & Dialogue": [
+      "conversational.turn_taking",
+      "conversational.interpersonal_dynamics",
+      "camera.angles"
+    ],
+    "Modular: Music & Live Performance": [
+      "performance.stage_and_lighting",
+      "performance.rhythm_sync",
+      "camera.movement"
+    ],
+    "Modular: Commercial & Persuasion": [
+      "advertising.value_prop",
+      "advertising.call_to_action",
+      "text_ocr.on_screen_text"
     ]
   },
   "qwenvl": {
@@ -108,7 +199,8 @@
     "Short Story": "Write a short, imaginative story inspired by this image or video.",
     "Prompt Refine & Expand": "Refine and enhance the following user prompt for creative text-to-image generation. Keep the meaning and keywords, make it more expressive and visually rich. Output ONLY the improved prompt text (no preface, no bullets, no JSON, no <think>, no commentary).",
     "Ultra Cinematic Detailed": "Analyze this image with EXTREME focus on visual micro-details. Describe every texture (fabric weave, skin pores, surface weathering), lighting nuance (exact color temperature, shadow fall-off, practical sources), and material quality (reflectivity, roughness). Break down the composition, depth of field, and camera lens characteristics. Output ONE dense, highly descriptive paragraph suitable for high-end generative reproduction. No narrative fluff, just pure visual data.",
-    "Cinematic Rhythm & Shot Breakdown": "Analyze this shot using precise cinematographic taxonomy. Identify:\n- Shot Scale: Choose from [Extreme Wide, Wide, Medium Wide, Medium, Medium Close, Close-up, Extreme Close-up].\n- Camera Movement: Choose from [Static, Push in, Pull out, Pan left/right, Tilt up/down, Tracking, Handheld, Whip pan, Drone].\n- Narrative Rhythm Role: Choose from [Hook, Setup, Progression, Emphasis, Turning Point, Payoff, Breath, Close].\n- Visible Content: Write ONE dense, concrete paragraph (4-6 sentences) describing ONLY visible subjects, physical actions, environment, lighting direction, and materials. Do NOT use vague subjective phrases (no 'visually stunning', no 'atmospheric', no 'cinematic vibe') and do NOT open with 'This shot shows...'. No preface, no reasoning, no <think>."
+    "Cinematic Rhythm & Shot Breakdown": "Analyze this shot using precise cinematographic taxonomy. Identify:\n- Shot Scale: Choose from [Extreme Wide, Wide, Medium Wide, Medium, Medium Close, Close-up, Extreme Close-up].\n- Camera Movement: Choose from [Static, Push in, Pull out, Pan left/right, Tilt up/down, Tracking, Handheld, Whip pan, Drone].\n- Narrative Rhythm Role: Choose from [Hook, Setup, Progression, Emphasis, Turning Point, Payoff, Breath, Close].\n- Visible Content: Write ONE dense, concrete paragraph (4-6 sentences) describing ONLY visible subjects, physical actions, environment, lighting direction, and materials. Do NOT use vague subjective phrases (no 'visually stunning', no 'atmospheric', no 'cinematic vibe') and do NOT open with 'This shot shows...'. No preface, no reasoning, no <think>.",
+    "Evidence-Based Shot Breakdown": "Analyze this shot using strict evidence-based methodology. Describe ONLY what is directly visible: physical subjects, concrete actions, setting, lighting, and camera angle. Explicitly separate observations from inferences. Avoid all mind-reading language (no 'clearly intends', 'trying to', 'wants to'). Tag any uncertainty with hedging phrases ('appears to', 'consistent with'). Do not invent off-screen context. No preface, no reasoning, no <think>."
   },
   "qwen_text": {
     "translation_prompt": "You are a professional prompt translator. Return a single English paragraph (150 to 300 words). No prefixes, bullets, JSON, or <think>. Preserve all visual and stylistic details.",

@@ -32,7 +32,7 @@
 import fs from 'fs';
 import path from 'path';
 import { extractWindowFrames, extractSingleHighResFrame } from '../ffmpeg.ts';
-import { callLMStudioChat, analyzeFrame } from '../lmstudio.ts';
+import { callLlamaServerChat, analyzeFrame } from '../llamaServer.ts';
 import { buildLabeledImageContent } from './coarsePass.ts';
 import { parseRefinementResponse } from './promptToolParser.ts';
 import {
@@ -202,16 +202,16 @@ export async function refineCandidate({
     ];
 
     console.log(
-      `[CANDIDATE_REFINER] Calling LM Studio (Candidate ${candidateIndex + 1}, ` +
+      `[CANDIDATE_REFINER] Calling llama-server (Candidate ${candidateIndex + 1}, ` +
       `Iter ${zoomIterationCounter + 1}, Budget Remaining: ${zoomCallBudget.remaining})...`
     );
 
     let rawModelResponseText = '';
     try {
-      rawModelResponseText = await callLMStudioChat(isolatedChatMessages, 0.2, 1024);
+      rawModelResponseText = await callLlamaServerChat(isolatedChatMessages, 0.2, 1024);
       console.log(`[CANDIDATE_REFINER] Model response:\n`, rawModelResponseText);
     } catch (modelCallError) {
-      console.error(`[CANDIDATE_REFINER] LM Studio call failed on iteration ${zoomIterationCounter}:`, modelCallError);
+      console.error(`[CANDIDATE_REFINER] llama-server call failed on iteration ${zoomIterationCounter}:`, modelCallError);
       break;
     }
 

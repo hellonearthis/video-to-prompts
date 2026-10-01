@@ -203,8 +203,9 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   initAI: (modelId: string) => ipcRenderer.invoke('ai-init', modelId),
 
   /**
-   * Check if LM Studio is running. 
+   * Check if llama-server is running.
    */
+  checkLlamaServer: () => ipcRenderer.invoke('ai-init'),
   checkLMStudio: () => ipcRenderer.invoke('ai-init'),
 
   /**

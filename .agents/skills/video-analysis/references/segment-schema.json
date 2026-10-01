@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VideoAnalysis",
+  "type": "object",
+  "required": ["intake", "segments"],
+  "properties": {
+    "intake": {
+      "type": "object",
+      "required": ["basis"],
+      "properties": {
+        "basis": {
+          "enum": ["direct_playback", "sampled_frames", "transcript_only", "audio_only", "metadata_only", "user_description"]
+        },
+        "sampling_interval_s": { "type": ["number", "null"] },
+        "timestamp_precision_s": { "type": ["number", "null"] },
+        "duration_s": { "type": ["number", "null"] },
+        "has_audio": { "type": ["boolean", "null"] },
+        "speech_analyzed": { "type": "boolean" },
+        "technical": {
+          "type": "object",
+          "properties": {
+            "resolution": { "type": "string" },
+            "frame_rate": { "type": "string" },
+            "aspect_ratio": { "type": "string" },
+            "codecs": { "type": "array", "items": { "type": "string" } },
+            "audio_channels": { "type": ["number", "null"] },
+            "audio_sample_rate": { "type": ["string", "number", "null"] },
+            "metadata_tags": { "type": "object" }
+          }
+        },
+        "limitations": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "start_s", "end_s", "visual"],
+        "properties": {
+          "id": { "type": "string", "description": "e.g. S3" },
+          "start_s": { "type": "number" },
+          "end_s": { "type": "number" },
+          "label": { "type": "string", "description": "Neutral label; no genre assumptions" },
+          "visual": { "type": "string" },
+          "audio": { "type": "string" },
+          "text_on_screen": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": { "type": "string" },
+                "legible": { "enum": ["full", "partial", "illegible"] },
+                "kind": { "enum": ["in_scene", "overlay", "caption", "ui", "unknown"] }
+              }
+            }
+          },
+          "speech": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "speaker_label": { "type": "string" },
+                "text": { "type": "string" },
+                "clarity": { "enum": ["clear", "partial", "unclear"] }
+              }
+            }
+          },
+          "agents": { "type": "array", "items": { "type": "string" } },
+          "objects": { "type": "array", "items": { "type": "string" } },
+          "actions": { "type": "array", "items": { "type": "string" } },
+          "setting": { "type": "string" },
+          "camera": { "type": "string" },
+          "lighting_color": { "type": "string" },
+          "transition_in": { "type": "string" },
+          "transition_out": { "type": "string" },
+          "repetitions": { "type": "array", "items": { "type": "string" } },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["claim", "source", "status"],
+              "properties": {
+                "claim": { "type": "string" },
+                "source": { "enum": ["visual", "audio", "text", "temporal", "metadata", "user"] },
+                "status": { "enum": ["observed", "inferred", "hypothesis", "unknown"] },
+                "confidence": { "enum": ["confirmed", "probable", "possible", "uncertain"] }
+              }
+            }
+          },
+          "uncertainty": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "patterns": { "type": "array", "items": { "type": "string" } },
+    "interpretations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "statement": { "type": "string" },
+          "supporting": { "type": "array", "items": { "type": "string" } },
+          "opposing": { "type": "array", "items": { "type": "string" } },
+          "alternatives": { "type": "array", "items": { "type": "string" } },
+          "confidence": { "enum": ["probable", "possible", "uncertain"] }
+        }
+      }
+    },
+    "unknowns": { "type": "array", "items": { "type": "string" } },
+    "safety_notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

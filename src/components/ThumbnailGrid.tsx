@@ -15,6 +15,7 @@ export interface FrameData {
     pairRole?: 'start_15' | 'end_85';
     camera_movement?: string;
     rhythm_role?: string;
+    shot_scale?: string;
     /** AI-generated summary description */
     description?: string;
     /** AI-detected objects in frame */
@@ -27,6 +28,21 @@ export interface FrameData {
     visual_elements?: {
         dominant_colors: string[];
         lighting: string;
+    };
+    /** Output from a specific style transformation (e.g. Poetic, Glitch) */
+    styled_content?: string;
+    /** Result of a conflict/consistency check */
+    consistency_check?: string;
+    /** On-screen text items with placement and diegetic flags */
+    on_screen_text?: {
+        text: string;
+        placement?: string;
+        is_diegetic?: boolean;
+    }[];
+    /** Epistemic evidence breakdown */
+    evidence_breakdown?: {
+        observable_facts: string[];
+        inferred_intent?: string;
     };
     /** Whether this frame has been analyzed */
     isAnalyzed?: boolean;
@@ -165,13 +181,13 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                         <label>Prompt:</label>
                         <select
                             value={selectedPrompt}
-                            onChange={(e) => onPromptChange(e.target.value)}
+                            onChange={(event_change_object) => onPromptChange(event_change_object.target.value)}
                             className="header-select"
                             disabled={isAnalyzing}
                         >
                             {availablePrompts.length === 0 && <option value="Default">Default</option>}
-                            {Array.isArray(availablePrompts) && availablePrompts.map(p => (
-                                <option key={p} value={p}>{p}</option>
+                            {Array.isArray(availablePrompts) && availablePrompts.map(prompt_preset_identifier => (
+                                <option key={prompt_preset_identifier} value={prompt_preset_identifier}>{prompt_preset_identifier}</option>
                             ))}
                         </select>
                     </div>
@@ -192,14 +208,13 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                             <label>Style:</label>
                             <select
                                 value={selectedStyle}
-                                onChange={(e) => onStyleChange(e.target.value)}
-                                className="header-select"
+                                onChange={(event_change_object) => onStyleChange(event_change_object.target.value)}
+                                className="header-select header-select-narrow"
                                 disabled={isAnalyzing}
-                                style={{ width: '100px' }}
                             >
                                 <option value="">None</option>
-                                {availableStyles.map(s => (
-                                    <option key={s} value={s}>{s}</option>
+                                {availableStyles.map(style_option_identifier => (
+                                    <option key={style_option_identifier} value={style_option_identifier}>{style_option_identifier}</option>
                                 ))}
                             </select>
                         </div>
@@ -211,14 +226,13 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                             <label>Check:</label>
                             <select
                                 value={selectedRefinement}
-                                onChange={(e) => onRefinementChange(e.target.value)}
-                                className="header-select"
+                                onChange={(event_change_object) => onRefinementChange(event_change_object.target.value)}
+                                className="header-select header-select-narrow"
                                 disabled={isAnalyzing}
-                                style={{ width: '100px' }}
                             >
                                 <option value="">None</option>
-                                {availableRefinements.map(r => (
-                                    <option key={r} value={r}>{r}</option>
+                                {availableRefinements.map(refinement_option_identifier => (
+                                    <option key={refinement_option_identifier} value={refinement_option_identifier}>{refinement_option_identifier}</option>
                                 ))}
                             </select>
                         </div>
@@ -416,9 +430,9 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                                         {/* Objects */}
                                         {frame.objects && frame.objects.length > 0 && (
                                             <div className="analysis-tag-list">
-                                                {frame.objects.slice(0, 5).map((obj, i) => (
-                                                    <span key={i} className="object-badge">
-                                                        {obj}
+                                                {frame.objects.slice(0, 5).map((detected_object_name, object_list_index) => (
+                                                    <span key={object_list_index} className="object-badge">
+                                                        {detected_object_name}
                                                     </span>
                                                 ))}
                                                 {frame.objects.length > 5 && (
@@ -429,12 +443,58 @@ export const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                                             </div>
                                         )}
 
+                                        {/* On-Screen Text (OCR & Diegetic Extraction) */}
+                                        {frame.on_screen_text && frame.on_screen_text.length > 0 && (
+                                            <div className="analysis-text-ocr-box">
+                                                <span className="analysis-text-ocr-label">🔤 Text: </span>
+                                                {frame.on_screen_text.map((on_screen_text_item, text_entry_index) => (
+                                                    <span key={text_entry_index} className="analysis-text-ocr-item" title={on_screen_text_item.is_diegetic ? 'In-scene (Diegetic)' : 'Digital Overlay'}>
+                                                        "{on_screen_text_item.text}" <small className="analysis-text-ocr-meta">({on_screen_text_item.placement || (on_screen_text_item.is_diegetic ? 'in-scene' : 'overlay')})</small>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Evidence Breakdown (Fact vs Inference) */}
+                                        {frame.evidence_breakdown && (frame.evidence_breakdown.observable_facts?.length > 0 || frame.evidence_breakdown.inferred_intent) && (
+                                            <div className="analysis-evidence-box">
+                                                {frame.evidence_breakdown.observable_facts && frame.evidence_breakdown.observable_facts.length > 0 && (
+                                                    <div>
+                                                        <span className="analysis-evidence-observed-label">👁️ Observed: </span>
+                                                        <span className="analysis-evidence-observed-text">{frame.evidence_breakdown.observable_facts.join('; ')}</span>
+                                                    </div>
+                                                )}
+                                                {frame.evidence_breakdown.inferred_intent && (
+                                                    <div className="analysis-evidence-inferred-row">
+                                                        <span className="analysis-evidence-inferred-label">💡 Inferred: </span>
+                                                        <span className="analysis-evidence-inferred-text">{frame.evidence_breakdown.inferred_intent}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Second-Pass Styled Content */}
+                                        {frame.styled_content && (
+                                            <div className="analysis-styled-box">
+                                                <span className="analysis-styled-label">✨ Style: </span>
+                                                <span className="analysis-styled-text">{frame.styled_content}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Consistency / Conflict Check */}
+                                        {frame.consistency_check && (
+                                            <div className="analysis-check-box">
+                                                <span className="analysis-check-label">⚖️ Check: </span>
+                                                <span className="analysis-check-text">{frame.consistency_check}</span>
+                                            </div>
+                                        )}
+
                                         {/* Tags */}
                                         {frame.tags && frame.tags.length > 0 && (
                                             <div className="analysis-tag-list">
-                                                {frame.tags.slice(0, 5).map((tag, i) => (
-                                                    <span key={i} className="tag-badge">
-                                                        #{tag}
+                                                {frame.tags.slice(0, 5).map((descriptive_tag_name, tag_list_index) => (
+                                                    <span key={tag_list_index} className="tag-badge">
+                                                        #{descriptive_tag_name}
                                                     </span>
                                                 ))}
                                                 {frame.tags.length > 5 && (

@@ -1,0 +1,59 @@
+{
+  "intake": {
+    "basis": "sampled_frames",
+    "sampling_interval_s": 1.0,
+    "timestamp_precision_s": 1.0,
+    "duration_s": 12.0,
+    "has_audio": true,
+    "speech_analyzed": false,
+    "technical": { "resolution": "320x240", "frame_rate": "25", "aspect_ratio": "4:3", "codecs": ["video:h264", "audio:aac"] },
+    "limitations": [
+      "Frames sampled every 1 s; events between samples may be missed.",
+      "Speech was not transcribed; audio is described from level and silence measurements only."
+    ]
+  },
+  "segments": [
+    {
+      "id": "S1", "start_s": 0, "end_s": 4, "label": "Red field with tone",
+      "visual": "Uniform red frame, no visible objects or text across all four sampled frames.",
+      "audio": "Continuous steady tone throughout.",
+      "claims": [
+        { "claim": "The frame is a uniform red field from 00:00 to 00:04", "source": "visual", "status": "observed", "confidence": "confirmed" },
+        { "claim": "A steady tone plays for the whole segment", "source": "audio", "status": "observed", "confidence": "confirmed" }
+      ],
+      "transition_out": "Hard cut to blue at 00:04"
+    },
+    {
+      "id": "S2", "start_s": 4, "end_s": 8, "label": "Blue field with silence",
+      "visual": "Uniform blue frame, no visible objects or text.",
+      "audio": "No sound above the silence threshold for the whole segment.",
+      "claims": [
+        { "claim": "The tone stops at the same moment the picture changes", "source": "temporal", "status": "observed", "confidence": "confirmed" },
+        { "claim": "The simultaneous change may indicate a deliberate edit rather than two unrelated recordings", "source": "temporal", "status": "inferred", "confidence": "possible" }
+      ],
+      "transition_in": "Hard cut from red at 00:04",
+      "transition_out": "Hard cut to green at 00:08"
+    },
+    {
+      "id": "S3", "start_s": 8, "end_s": 12, "label": "Green field with higher tone",
+      "visual": "Uniform green frame, no visible objects or text.",
+      "audio": "Steady tone at a higher pitch than in S1.",
+      "claims": [
+        { "claim": "The tone resumes at a higher pitch than in S1", "source": "audio", "status": "observed", "confidence": "confirmed" }
+      ],
+      "transition_in": "Hard cut from blue at 00:08"
+    }
+  ],
+  "patterns": ["Each 4 s segment changes picture and sound together at the cut."],
+  "interpretations": [
+    {
+      "statement": "The clip may be a test pattern checking picture and sound synchronization.",
+      "supporting": ["Uniform fields", "Equal 4 s segments", "Sound changes aligned with each cut"],
+      "opposing": [],
+      "alternatives": ["A placeholder clip with no purpose beyond being a sample"],
+      "confidence": "possible"
+    }
+  ],
+  "unknowns": ["Creator intent", "Source and production method", "Whether the tones are exact frequencies"],
+  "safety_notes": []
+}

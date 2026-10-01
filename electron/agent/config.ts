@@ -23,17 +23,17 @@
  * safely under 16,000 context tokens while maintaining maximum temporal precision.
  */
 
-/**
- * The base URL for the local LM Studio server.
- * LM Studio provides an OpenAI-compatible REST API.
- */
-export const LM_STUDIO_BASE_URL = "http://localhost:1234/v1";
+const LLAMA_PORT = (typeof process !== 'undefined' && process.env?.LLAMA_SERVER_PORT) || '8081';
+export const LLAMA_SERVER_BASE_URL = (typeof process !== 'undefined' && process.env?.LOCAL_AI_URL)
+    ? `${process.env.LOCAL_AI_URL.replace(/\/+$/, '')}/v1`
+    : `http://localhost:${LLAMA_PORT}/v1`;
 
-/**
- * The specific chat completions endpoint used for multi-modal inference.
- */
-export const LM_STUDIO_CHAT_COMPLETIONS_URL = "http://localhost:1234/v1/chat/completions";
-export const LM_STUDIO_URL = LM_STUDIO_CHAT_COMPLETIONS_URL; // Backward-compatible alias
+export const LLAMA_SERVER_CHAT_COMPLETIONS_URL = `${LLAMA_SERVER_BASE_URL}/chat/completions`;
+
+// Backward-compatible aliases
+export const LM_STUDIO_BASE_URL = LLAMA_SERVER_BASE_URL;
+export const LM_STUDIO_CHAT_COMPLETIONS_URL = LLAMA_SERVER_CHAT_COMPLETIONS_URL;
+export const LM_STUDIO_URL = LLAMA_SERVER_CHAT_COMPLETIONS_URL;
 
 /**
  * ============================================================================

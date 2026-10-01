@@ -27,7 +27,7 @@
  * coarse frameIndex, and passes it to Phase B for high-speed zoom extraction.
  */
 
-import { callLMStudioChat } from '../lmstudio.ts';
+import { callLlamaServerChat } from '../llamaServer.ts';
 import { buildLabeledImageContent, type CoarsePassResult } from './coarsePass.ts';
 import { formatTranscriptSegmentsForPrompt } from './transcriptImport.ts';
 import { parseCandidateResponse } from './promptToolParser.ts';
@@ -112,11 +112,11 @@ export async function identifyCandidates(
   ];
 
   console.log(
-    `[CANDIDATE_IDENTIFIER] Calling LM Studio with ${labeledCoarseFrames.length} coarse frames ` +
+    `[CANDIDATE_IDENTIFIER] Calling llama-server with ${labeledCoarseFrames.length} coarse frames ` +
     `(hasTranscript: ${hasDialogueTranscript}, maxCandidates: ${maximumCandidatesCount})...`
   );
 
-  const rawModelResponseText = await callLMStudioChat(chatMessagesPayload, 0.4, 2048);
+  const rawModelResponseText = await callLlamaServerChat(chatMessagesPayload, 0.4, 2048);
   console.log(`[CANDIDATE_IDENTIFIER] Raw model response received:\n`, rawModelResponseText);
 
   // 3. Parse candidates and map frameIndex -> physical timestamp

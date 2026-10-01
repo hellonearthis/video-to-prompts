@@ -102,10 +102,10 @@ function App() {
   const [cachedAnalysis, setCachedAnalysis] = useState<SceneAnalysis | null>(null);
 
   // --------------------------------------------------------------------------
-  // AI Model State (LM Studio)
+  // AI Model State (llama-server / OpenAI-compatible engine)
   // --------------------------------------------------------------------------
 
-  const [aiStatusMessage, setAiStatusMessage] = useState<string>('Checking LM Studio...');
+  const [aiStatusMessage, setAiStatusMessage] = useState<string>('Checking AI Engine...');
 
   const [showExtractionDialog, setShowExtractionDialog] = useState(false);
   const [existingFramesCount, setExistingFramesCount] = useState(0);
@@ -217,19 +217,19 @@ function App() {
   }, []);
 
   /**
-   * Initialize LM Studio connection on load
+   * Initialize local AI engine connection on load (llama-server on localhost:8081)
    */
   useEffect(() => {
-    window.ipcRenderer.checkLMStudio()
+    window.ipcRenderer.checkLlamaServer()
       .then((result: any) => {
         if (result.success) {
-          setAiStatusMessage('LM Studio Connected');
+          setAiStatusMessage('AI Engine Connected');
         } else {
-          setAiStatusMessage('LM Studio Disconnected');
+          setAiStatusMessage('AI Engine Disconnected');
         }
       })
       .catch((err: Error) => {
-        console.error('Failed to connect to LM Studio:', err);
+        console.error('Failed to connect to AI engine:', err);
         setAiStatusMessage('Connection Error');
       });
   }, []);
@@ -257,18 +257,18 @@ function App() {
 
   const handleModelChange = () => {
     // Refresh connection status
-    setAiStatusMessage('Checking LM Studio...');
-    window.ipcRenderer.checkLMStudio()
+    setAiStatusMessage('Checking AI Engine...');
+    window.ipcRenderer.checkLlamaServer()
       .then((result: any) => {
         if (result.success) {
-          setAiStatusMessage('LM Studio Connected');
+          setAiStatusMessage('AI Engine Connected');
         } else {
-          setAiStatusMessage('LM Studio Disconnected');
-          alert('LM Studio not found. Please ensure LM Studio is running on localhost:1234');
+          setAiStatusMessage('AI Engine Disconnected');
+          alert('AI Engine not found. Please ensure llama-server is running on localhost:8081 (or configured port).');
         }
       })
       .catch(err => {
-        console.error('Failed to check LM Studio:', err);
+        console.error('Failed to check AI engine:', err);
         setAiStatusMessage('Connection Error');
       });
   };
@@ -481,6 +481,13 @@ function App() {
               tags: result.analysis.tags,
               scene_type: result.analysis.scene_type,
               visual_elements: result.analysis.visual_elements,
+              styled_content: result.analysis.styled_content,
+              consistency_check: result.analysis.consistency_check,
+              rhythm_role: result.analysis.rhythm_role,
+              camera_movement: result.analysis.camera_movement,
+              shot_scale: result.analysis.shot_scale,
+              on_screen_text: result.analysis.on_screen_text,
+              evidence_breakdown: result.analysis.evidence_breakdown,
               isAnalyzed: true,
               analysisError: undefined
             };
@@ -859,7 +866,7 @@ function App() {
               availablePrompts={availablePrompts}
               selectedPrompt={selectedPrompt}
               onPromptChange={setSelectedPrompt}
-              selectedModel={aiStatusMessage === 'LM Studio Connected' ? 'LM Studio' : 'Not Connected'}
+              selectedModel={aiStatusMessage.includes('Connected') ? 'llama-server' : 'Not Connected'}
               onModelChange={handleModelChange}
               availableStyles={availableStyles}
               selectedStyle={selectedStyle}

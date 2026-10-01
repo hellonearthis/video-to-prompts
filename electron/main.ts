@@ -22,8 +22,8 @@ import {
   analyzeFrame,
   analyzeFramesBatch,
   compareFrames,
-  checkLMStudioConnection
-} from './lmstudio'
+  checkLlamaServerConnection
+} from './llamaServer'
 
 // ============================================================================
 // ESM Compatibility
@@ -341,16 +341,17 @@ app.whenReady().then(() => {
    */
   ipcMain.handle('ai-init', async () => {
     try {
-      const isConnected = await checkLMStudioConnection();
+      const isConnected = await checkLlamaServerConnection();
       if (isConnected) {
-        win?.webContents.send('ai-progress', { status: 'ready', data: 'LM Studio Connected' });
+        win?.webContents.send('ai-progress', { status: 'ready', data: 'AI Engine Connected' });
         return { success: true };
       } else {
-        win?.webContents.send('ai-progress', { status: 'error', data: 'LM Studio Not Found' });
-        return { success: false, error: 'LM Studio is not running on localhost:1234' };
+        win?.webContents.send('ai-progress', { status: 'error', data: 'AI Engine Not Found' });
+        const port = process.env.LLAMA_SERVER_PORT || '8081';
+        return { success: false, error: `AI server (llama-server) is not running on localhost:${port}` };
       }
     } catch (error) {
-      console.error('[LM-STUDIO] Connection check failed:', error);
+      console.error('[LLAMA-SERVER] Connection check failed:', error);
       return { success: false, error: 'Connection failed' };
     }
   })
@@ -359,7 +360,7 @@ app.whenReady().then(() => {
    * Get available prompts from prompts file.
    */
   ipcMain.handle('get-available-prompts', async () => {
-    const { getAvailablePrompts } = await import('./lmstudio');
+    const { getAvailablePrompts } = await import('./llamaServer');
     return getAvailablePrompts();
   })
 
@@ -444,7 +445,7 @@ app.whenReady().then(() => {
         });
 
       } catch (error) {
-        console.error(`[LM-STUDIO] Sequential analysis failed at pair ${i}:`, error);
+        console.error(`[LLAMA-SERVER] Sequential analysis failed at pair ${i}:`, error);
         results.push({
           index: i,
           frame1: imagePaths[i],
@@ -460,7 +461,7 @@ app.whenReady().then(() => {
    * Analyze a story sequence (batch of frames) for narrative structure.
    */
   ipcMain.handle('analyze-story-sequence', async (_, imagePaths: string[]) => {
-    const { analyzeSequence } = await import('./lmstudio');
+    const { analyzeSequence } = await import('./llamaServer');
     return await analyzeSequence(imagePaths);
   })
 

@@ -13,11 +13,24 @@ interface VideoInfo {
     bitrate: number;
 }
 
+interface OnScreenTextItem {
+    text: string;
+    placement?: string;
+    is_diegetic?: boolean;
+}
+
+interface EvidenceBreakdown {
+    observable_facts: string[];
+    inferred_intent?: string;
+}
+
 /**
- * Analysis result from LM Studio vision model.
+ * Analysis result from llama-server vision model.
  */
 interface FrameAnalysis {
     summary: string;
+    styled_content?: string;
+    consistency_check?: string;
     objects: string[];
     tags: string[];
     scene_type: string;
@@ -25,6 +38,11 @@ interface FrameAnalysis {
         dominant_colors: string[];
         lighting: string;
     };
+    rhythm_role?: string;
+    camera_movement?: string;
+    shot_scale?: string;
+    on_screen_text?: OnScreenTextItem[];
+    evidence_breakdown?: EvidenceBreakdown;
 }
 
 /**
@@ -117,6 +135,7 @@ interface Window {
         loadStoryTimeline: (outputDir: string) => Promise<{ success: boolean; timeline?: any; error?: string }>;
         saveFramesData: (outputDir: string, data: any[]) => Promise<{ success: boolean; error?: string }>;
         loadFramesData: (outputDir: string) => Promise<{ success: boolean; data?: any[]; error?: string }>;
+        checkLlamaServer: () => Promise<{ success: boolean; error?: string }>;
         checkLMStudio: () => Promise<{ success: boolean; error?: string }>;
         getAvailablePrompts: () => Promise<{ prompts: string[]; styles?: string[]; refinements?: string[]; logs?: string[] }>;
         initAI: (modelId: string) => Promise<{ success: boolean; error?: string }>;

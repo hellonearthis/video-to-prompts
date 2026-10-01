@@ -35,3 +35,10 @@ release
 # OS Files
 Thumbs.db
 desktop.ini
+
+# Python bytecode and cache
+__pycache__/
+*.pyc
+
+# Local model selection state
+.last_model_choice
