@@ -137,20 +137,81 @@ $xaml_interface_specification = @"
         <Style TargetType="TextBlock">
             <Setter Property="FontFamily" Value="Segoe UI, Roboto, sans-serif"/>
         </Style>
+
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#252530"/>
+            <Setter Property="Background" Value="#242634"/>
             <Setter Property="Foreground" Value="#ffffff"/>
-            <Setter Property="BorderBrush" Value="#3a3a4c"/>
+            <Setter Property="BorderBrush" Value="#4cc9f0"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
+
+        <!-- High-Contrast ComboBox ToggleButton Template -->
+        <ControlTemplate x:Key="HighContrastComboBoxToggleButton" TargetType="ToggleButton">
+            <Border x:Name="TemplateRoot" Background="#242634" BorderBrush="#4cc9f0" BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="true">
+                <Border x:Name="SplitBorder" Width="26" HorizontalAlignment="Right" SnapsToDevicePixels="true">
+                    <Path x:Name="Arrow" Data="F1 M 0,0 L 2.667,2.667 L 5.333,0 L 0,0 Z" Fill="#4cc9f0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Border>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="true">
+                    <Setter TargetName="TemplateRoot" Property="Background" Value="#2f3244"/>
+                    <Setter TargetName="TemplateRoot" Property="BorderBrush" Value="#82cfff"/>
+                    <Setter TargetName="Arrow" Property="Fill" Value="#82cfff"/>
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <!-- High-Contrast ComboBox Style -->
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#252530"/>
             <Setter Property="Foreground" Value="#ffffff"/>
-            <Setter Property="BorderBrush" Value="#3a3a4c"/>
-            <Setter Property="Padding" Value="6,4"/>
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="SnapsToDevicePixels" Value="true"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid x:Name="MainGrid" SnapsToDevicePixels="true">
+                            <Popup x:Name="PART_Popup" AllowsTransparency="true" IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom" Margin="1">
+                                <Border x:Name="DropDownBorder" Background="#1e202c" BorderBrush="#4cc9f0" BorderThickness="1" CornerRadius="4" MinWidth="{Binding ActualWidth, ElementName=MainGrid}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <ScrollViewer x:Name="DropDownScrollViewer">
+                                        <Grid RenderOptions.ClearTypeHint="Enabled">
+                                            <Canvas Height="0" Width="0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                                            <ItemsPresenter x:Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                        </Grid>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                            <ToggleButton x:Name="ToggleButton" Template="{StaticResource HighContrastComboBoxToggleButton}" Grid.ColumnSpan="2" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <ContentPresenter ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" Content="{TemplateBinding SelectionBoxItem}" ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" HorizontalAlignment="Left" Margin="10,6,28,6" IsHitTestVisible="false" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+
+        <!-- High-Contrast ComboBoxItem Style -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="#1e202c"/>
+            <Setter Property="Foreground" Value="#ffffff"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="SnapsToDevicePixels" Value="true"/>
+            <Style.Triggers>
+                <Trigger Property="IsHighlighted" Value="true">
+                    <Setter Property="Background" Value="#0284c7"/>
+                    <Setter Property="Foreground" Value="#ffffff"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="true">
+                    <Setter Property="Background" Value="#0369a1"/>
+                    <Setter Property="Foreground" Value="#ffffff"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="#d0d0d8"/>
             <Setter Property="FontSize" Value="12"/>
@@ -258,8 +319,8 @@ $xaml_interface_specification = @"
                             <ColumnDefinition Width="140"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Context Tokens (-c):" VerticalAlignment="Center" Foreground="#b0b0c0" FontSize="12"/>
-                        <ComboBox Name="ContextTokensComboBox" Grid.Column="1">
+                        <TextBlock Grid.Column="0" Text="Context Tokens (-c):" VerticalAlignment="Center" Foreground="#ffffff" FontWeight="SemiBold" FontSize="12"/>
+                        <ComboBox Name="ContextTokensComboBox" Grid.Column="1" Cursor="Hand">
                             <ComboBoxItem Content="16384 (16k - Recommended)" Tag="16384" IsSelected="True"/>
                             <ComboBoxItem Content="8192 (8k - Fast)" Tag="8192"/>
                             <ComboBoxItem Content="32768 (32k - Extended)" Tag="32768"/>
@@ -272,7 +333,7 @@ $xaml_interface_specification = @"
                             <ColumnDefinition Width="140"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Server Port:" VerticalAlignment="Center" Foreground="#b0b0c0" FontSize="12"/>
+                        <TextBlock Grid.Column="0" Text="Server Port:" VerticalAlignment="Center" Foreground="#ffffff" FontWeight="SemiBold" FontSize="12"/>
                         <TextBox Name="ServerPortTextBox" Grid.Column="1" Text="8081"/>
                     </Grid>
                 </StackPanel>
