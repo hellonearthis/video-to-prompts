@@ -167,15 +167,33 @@ You can customize the AI analysis behavior by editing the `qwen_vl3_prompts.json
 
 ## Getting Started
 
-### 1. One-Click Launcher (`launch.bat`)
+### 1. Graphical GUI Launcher (`launch_gui.bat`) — Recommended
 
-The easiest way to start both `llama-server` and the application is with the bundled interactive launcher:
+Launch the modern dark-mode Windows Presentation Foundation (WPF) graphical launcher with one click:
+
+```cmd
+launch_gui.bat
+```
+
+**GUI Features:**
+- 🔍 **Real-time Filter & Search**: Instantly filter across all 15+ vision models by typing names or parameters.
+- 📊 **Visual Library Grid**: Clear list displaying model names, file sizes in GB, parent folders, and paired `mmproj` projectors.
+- ⚙️ **One-Click Hardware Optimization**: Dropdowns for context window (16k default, 8k, 32k) and checkboxes for 8-bit quantized KV caching (`-ctk q8_0 -ctv q8_0`), Flash Attention, and GPU offload.
+- 🚀 **One-Click Actions**:
+  - **"Launch AI Server & App"**: Automatically stops occupied ports, launches `llama-server.exe`, and starts the Electron dev server.
+  - **"Launch App Only"**: Connects immediately if `llama-server` is already active in the background.
+  - **"Stop Server"**: Safely frees port `8081` on demand.
+
+### 2. Interactive Console Launcher (`launch.bat`)
+
+If you prefer a terminal console interface:
 
 ```cmd
 launch.bat
 ```
+*(Press `G` at the menu prompt to open the GUI launcher at any time).*
 
-**What the launcher does automatically:**
+**What the console launcher does automatically:**
 1. Scans `C:\llamaCPP\models` for all GGUF vision models and automatically matches them with their corresponding `mmproj*.gguf` files.
 2. Remembers your last selected model for fast one-press launch.
 3. Checks if port `8081` is already occupied, offering to stop existing instances cleanly.
@@ -187,7 +205,7 @@ launch.bat
 5. Waits for `http://localhost:8081/v1/models` to report ready.
 6. Launches the Electron desktop app via Vite dev server.
 
-### 2. Manual Startup (Alternative)
+### 3. Manual Startup (Alternative)
 
 If running `llama-server` manually:
 ```cmd
@@ -263,7 +281,9 @@ The project includes workspace MCP configurations for both `chrome-devtools-mcp`
 
 ```
 Video to Prompts/
-├── launch.bat                  # One-click Windows batch launcher
+├── launch_gui.bat              # One-click Windows dark-mode GUI launcher
+├── launcher_gui.ps1            # Native WPF hardware-accelerated GUI model selector
+├── launch.bat                  # One-click Windows console batch launcher
 ├── launcher.ps1                # Interactive PowerShell vision model selector & server daemon
 ├── qwen_vl3_prompts.json       # Modular prompt system config (modules, presets, styles, refinements)
 ├── readme_modular.md           # Modular prompt architecture guide & schema reference

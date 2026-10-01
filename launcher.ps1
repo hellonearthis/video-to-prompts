@@ -6,12 +6,18 @@ param (
     [string]$LlamaDir = "C:\llamaCPP",
     [int]$Port = 8081,
     [int]$ContextTokens = 16384,
-    [int]$ModelIndex = -999
+    [int]$ModelIndex = -999,
+    [switch]$Gui
 )
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LastChoiceFile = Join-Path $ScriptDir ".last_model_choice"
+
+if ($Gui) {
+    & (Join-Path $ScriptDir "launcher_gui.ps1") -llama_installation_directory $LlamaDir -default_server_port_number $Port -default_context_window_tokens $ContextTokens
+    exit 0
+}
 
 function Write-Color($text, $color = "Cyan") {
     Write-Host $text -ForegroundColor $color
@@ -124,6 +130,8 @@ for ($i = 0; $i -lt $VisionLibrary.Count; $i++) {
 Write-Host "---------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host " [ 0] " -ForegroundColor Yellow -NoNewline
 Write-Host "Skip starting llama-server (Use server already running on port $Port)" -ForegroundColor White
+Write-Host " [ G] " -ForegroundColor Yellow -NoNewline
+Write-Host "Open Graphical Launcher (Dark Mode WPF GUI)" -ForegroundColor Green
 Write-Host " [ Q] " -ForegroundColor Yellow -NoNewline
 Write-Host "Quit" -ForegroundColor White
 Write-Host ""
@@ -137,8 +145,12 @@ if ($ModelIndex -ne -999) {
         $SelectedIndex = $ModelIndex - 1
     }
 } else {
-    $choice = Read-Host "Select a model [1-$($VisionLibrary.Count) or 0, default=$DefaultIndex]"
+    $choice = Read-Host "Select a model [1-$($VisionLibrary.Count) or 0/G, default=$DefaultIndex]"
     if ($choice -match '^[Qq]') {
+        exit 0
+    }
+    if ($choice -match '^[Gg]') {
+        & (Join-Path $ScriptDir "launcher_gui.ps1") -llama_installation_directory $LlamaDir -default_server_port_number $Port -default_context_window_tokens $ContextTokens
         exit 0
     }
 
