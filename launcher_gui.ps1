@@ -129,7 +129,7 @@ function Discover-VisionModelLibrary {
 $xaml_interface_specification = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Video to Prompts — Local AI &amp; Application Launcher"
+        Title="Video to Prompts - Local AI &amp; Application Launcher"
         Height="720" Width="860" MinHeight="650" MinWidth="750"
         Background="#18181f" Foreground="#e0e0e0"
         WindowStartupLocation="CenterScreen">
@@ -176,7 +176,7 @@ $xaml_interface_specification = @"
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
-                    <TextBlock Text="🎬 VIDEO TO PROMPTS" FontSize="18" FontWeight="Bold" Foreground="#4cc9f0"/>
+                    <TextBlock Text="VIDEO TO PROMPTS" FontSize="18" FontWeight="Bold" Foreground="#4cc9f0"/>
                     <TextBlock Text="Universal Local Multimodal Vision &amp; Storyboard Studio Launcher" FontSize="12" Foreground="#8e8ea0" Margin="0,2,0,0"/>
                 </StackPanel>
                 <Border Grid.Column="1" Background="#143447" CornerRadius="4" Padding="10,4" VerticalAlignment="Center">
@@ -192,8 +192,8 @@ $xaml_interface_specification = @"
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBox Name="SearchInputTextBox" Grid.Column="0" Text="" Margin="0,0,10,0"/>
-            <TextBlock IsHitTestVisible="False" Text="🔍  Filter models by name, size, or family..." VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#6a6a7e" FontSize="13" Name="SearchPlaceholderTextBlock"/>
-            <Button Name="RefreshButton" Grid.Column="1" Content="🔄 Refresh Library" Background="#252532" Foreground="#d0d0dc" BorderBrush="#3a3a4c" Padding="12,6" Cursor="Hand" FontWeight="SemiBold"/>
+            <TextBlock IsHitTestVisible="False" Text="Filter models by name, size, or family..." VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#6a6a7e" FontSize="13" Name="SearchPlaceholderTextBlock"/>
+            <Button Name="RefreshButton" Grid.Column="1" Content="Refresh Library" Background="#252532" Foreground="#d0d0dc" BorderBrush="#3a3a4c" Padding="12,6" Cursor="Hand" FontWeight="SemiBold"/>
         </Grid>
 
         <!-- Model Selection Grid -->
@@ -295,7 +295,7 @@ $xaml_interface_specification = @"
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Button Name="LaunchFullStackButton" Grid.Column="0" Content="🚀 Launch AI Server &amp; App" Background="#059669" Foreground="#ffffff" FontWeight="Bold" FontSize="14" Padding="14,10" Margin="0,0,8,0" Cursor="Hand" BorderThickness="0">
+            <Button Name="LaunchFullStackButton" Grid.Column="0" Content="Launch AI Server &amp; App" Background="#059669" Foreground="#ffffff" FontWeight="Bold" FontSize="14" Padding="14,10" Margin="0,0,8,0" Cursor="Hand" BorderThickness="0">
                 <Button.Resources>
                     <Style TargetType="Border">
                         <Setter Property="CornerRadius" Value="6"/>
@@ -303,7 +303,7 @@ $xaml_interface_specification = @"
                 </Button.Resources>
             </Button>
 
-            <Button Name="LaunchAppOnlyButton" Grid.Column="1" Content="⚡ Launch App Only" Background="#2563eb" Foreground="#ffffff" FontWeight="SemiBold" FontSize="13" Padding="12,10" Margin="4,0,8,0" Cursor="Hand" BorderThickness="0" ToolTip="Starts the desktop application assuming llama-server is already active">
+            <Button Name="LaunchAppOnlyButton" Grid.Column="1" Content="Launch App Only" Background="#2563eb" Foreground="#ffffff" FontWeight="SemiBold" FontSize="13" Padding="12,10" Margin="4,0,8,0" Cursor="Hand" BorderThickness="0" ToolTip="Starts the desktop application assuming llama-server is already active">
                 <Button.Resources>
                     <Style TargetType="Border">
                         <Setter Property="CornerRadius" Value="6"/>
@@ -311,7 +311,7 @@ $xaml_interface_specification = @"
                 </Button.Resources>
             </Button>
 
-            <Button Name="StopServerButton" Grid.Column="2" Content="🛑 Stop Server" Background="#dc2626" Foreground="#ffffff" FontWeight="SemiBold" FontSize="13" Padding="12,10" Margin="4,0,0,0" Cursor="Hand" BorderThickness="0" ToolTip="Terminates any process currently occupying the configured port">
+            <Button Name="StopServerButton" Grid.Column="2" Content="Stop Server" Background="#dc2626" Foreground="#ffffff" FontWeight="SemiBold" FontSize="13" Padding="12,10" Margin="4,0,0,0" Cursor="Hand" BorderThickness="0" ToolTip="Terminates any process currently occupying the configured port">
                 <Button.Resources>
                     <Style TargetType="Border">
                         <Setter Property="CornerRadius" Value="6"/>
@@ -565,7 +565,7 @@ $launch_full_stack_button.Add_Click({
         'title Video to Prompts Dev Server & npm run dev'
     )
 
-    $status_message_text_block.Text = "✅ Everything Launched! Server: http://localhost:$target_port_number | Model: $($selected_vision_model_entry.DisplayName)"
+    $status_message_text_block.Text = "[OK] Everything Launched! Server: http://localhost:$target_port_number | Model: $($selected_vision_model_entry.DisplayName)"
     $activity_progress_bar.Visibility = [System.Windows.Visibility]::Collapsed
 })
 
